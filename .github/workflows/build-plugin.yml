@@ -1,0 +1,302 @@
+name: Build WordPress Plugin
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test Plugin
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        php-version: ['7.4', '8.0', '8.1', '8.2']
+        wordpress-version: ['6.0', '6.1', '6.2', '6.3', 'latest']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, mysql, mysqli, pdo_mysql, bcmath, soap, intl, gd, exif, iconv, imagick
+        coverage: none
+    
+    - name: Validate plugin structure
+      run: |
+        echo "Validating WordPress plugin structure..."
+        
+        # Check required files exist
+        if [ ! -f "wupz-plugin/wupz.php" ]; then
+          echo "❌ Main plugin file missing"
+          exit 1
+        fi
+        
+        if [ ! -d "wupz-plugin/includes" ]; then
+          echo "❌ Includes directory missing"
+          exit 1
+        fi
+        
+        if [ ! -d "wupz-plugin/assets" ]; then
+          echo "❌ Assets directory missing"
+          exit 1
+        fi
+        
+        if [ ! -d "wupz-plugin/templates" ]; then
+          echo "❌ Templates directory missing"
+          exit 1
+        fi
+        
+        echo "✅ Plugin structure validation passed"
+    
+    - name: PHP Syntax Check
+      run: |
+        echo "Checking PHP syntax..."
+        find wupz-plugin -name "*.php" -exec php -l {} \; | grep -v "No syntax errors"
+        if [ $? -eq 0 ]; then
+          echo "✅ PHP syntax check passed"
+        else
+          echo "❌ PHP syntax errors found"
+          exit 1
+        fi
+    
+    - name: WordPress Coding Standards
+      run: |
+        echo "Installing WordPress Coding Standards..."
+        composer global require "squizlabs/php_codesniffer=*"
+        composer global require wp-coding-standards/wpcs
+        ~/.composer/vendor/bin/phpcs --config-set installed_paths ~/.composer/vendor/wp-coding-standards/wpcs
+        
+        echo "Running WordPress Coding Standards check..."
+        ~/.composer/vendor/bin/phpcs --standard=WordPress --ignore=node_modules,vendor wupz-plugin/ || true
+
+  build:
+    name: Build Plugin Package
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get plugin version
+      id: version
+      run: |
+        VERSION=$(grep "Version:" wupz-plugin/wupz.php | head -1 | awk -F: '{print $2}' | xargs)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Plugin version: $VERSION"
+    
+    - name: Create build directory
+      run: |
+        mkdir -p build/wupz
+        echo "Build directory created"
+    
+    - name: Copy plugin files
+      run: |
+        echo "Copying plugin files..."
+        
+        # Copy main plugin files
+        cp -r wupz-plugin/* build/wupz/
+        
+                 # Create readme.txt for WordPress.org (if not exists)
+         if [ ! -f "build/wupz/readme.txt" ]; then
+           echo "Creating WordPress.org readme.txt file..."
+           echo "=== Wupz - WordPress Backup Plugin ===" > build/wupz/readme.txt
+           echo "Contributors: wupzbackup" >> build/wupz/readme.txt
+           echo "Tags: backup, database, files, scheduled, zip" >> build/wupz/readme.txt
+           echo "Requires at least: 5.0" >> build/wupz/readme.txt
+           echo "Tested up to: 6.3" >> build/wupz/readme.txt
+           echo "Requires PHP: 7.4" >> build/wupz/readme.txt
+           echo "Stable tag: 1.0.0" >> build/wupz/readme.txt
+           echo "License: GPLv2 or later" >> build/wupz/readme.txt
+           echo "License URI: https://www.gnu.org/licenses/gpl-2.0.html" >> build/wupz/readme.txt
+           echo "" >> build/wupz/readme.txt
+           echo "A comprehensive WordPress backup plugin that allows manual and scheduled backups." >> build/wupz/readme.txt
+           echo "" >> build/wupz/readme.txt
+           echo "== Description ==" >> build/wupz/readme.txt
+           echo "" >> build/wupz/readme.txt
+           echo "Wupz is a powerful and easy-to-use WordPress backup plugin." >> build/wupz/readme.txt
+         fi
+        
+        echo "✅ Plugin files copied successfully"
+    
+    - name: Remove development files
+      run: |
+        echo "Removing development files..."
+        
+        # Remove any development/build files that shouldn't be in the package
+        find build/wupz -name ".git*" -delete 2>/dev/null || true
+        find build/wupz -name "*.log" -delete 2>/dev/null || true
+        find build/wupz -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
+        find build/wupz -name ".DS_Store" -delete 2>/dev/null || true
+        
+        echo "✅ Development files removed"
+    
+    - name: Validate plugin package
+      run: |
+        echo "Validating plugin package..."
+        
+        # Check that main plugin file exists
+        if [ ! -f "build/wupz/wupz.php" ]; then
+          echo "❌ Main plugin file missing from package"
+          exit 1
+        fi
+        
+        # Check plugin header
+        if ! grep -q "Plugin Name:" build/wupz/wupz.php; then
+          echo "❌ Plugin header missing"
+          exit 1
+        fi
+        
+        # List package contents
+        echo "📦 Package contents:"
+        find build/wupz -type f | sort
+        
+        echo "✅ Plugin package validation passed"
+    
+    - name: Create ZIP package
+      run: |
+        echo "Creating ZIP package..."
+        cd build
+        zip -r "../wupz-${{ steps.version.outputs.version }}.zip" wupz/
+        cd ..
+        
+        # Verify ZIP was created
+        if [ ! -f "wupz-${{ steps.version.outputs.version }}.zip" ]; then
+          echo "❌ Failed to create ZIP package"
+          exit 1
+        fi
+        
+        echo "✅ ZIP package created: wupz-${{ steps.version.outputs.version }}.zip"
+        echo "📦 Package size: $(du -h wupz-${{ steps.version.outputs.version }}.zip | cut -f1)"
+    
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: wupz-plugin-${{ steps.version.outputs.version }}
+        path: wupz-${{ steps.version.outputs.version }}.zip
+        retention-days: 30
+    
+    - name: Upload build directory artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: wupz-plugin-build-${{ steps.version.outputs.version }}
+        path: build/
+        retention-days: 7
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get plugin version
+      id: version
+      run: |
+        VERSION=$(grep "Version:" wupz-plugin/wupz.php | head -1 | awk -F: '{print $2}' | xargs)
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Extract tag version
+        TAG_VERSION=${GITHUB_REF#refs/tags/v}
+        echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+        
+        echo "Plugin version: $VERSION"
+        echo "Tag version: $TAG_VERSION"
+    
+    - name: Download build artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: wupz-plugin-${{ steps.version.outputs.version }}
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        if [ -f "CHANGELOG.md" ]; then
+          # Extract changelog for current version
+          awk '/^## \[?'"${{ steps.version.outputs.version }}"'\]?/{flag=1; next} /^## \[?[0-9]/{flag=0} flag' CHANGELOG.md > release_notes.md
+        else
+          echo "## What's Changed in v${{ steps.version.outputs.version }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "* Plugin package created automatically" >> release_notes.md
+          echo "* See commit history for detailed changes" >> release_notes.md
+        fi
+        
+        echo "Generated release notes:"
+        cat release_notes.md
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: wupz-${{ steps.version.outputs.version }}.zip
+        body_path: release_notes.md
+        draft: false
+        prerelease: false
+        name: "Wupz WordPress Plugin v${{ steps.version.outputs.version }}"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: WordPress.org deployment preparation
+      run: |
+        echo "🚀 Release created successfully!"
+        echo "📦 Plugin package: wupz-${{ steps.version.outputs.version }}.zip"
+        echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+        echo ""
+        echo "To deploy to WordPress.org:"
+        echo "1. Download the ZIP file from the release"
+        echo "2. Extract and review the contents"
+        echo "3. Follow WordPress.org plugin submission guidelines"
+        echo "4. Upload to WordPress.org SVN repository"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download build artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: wupz-plugin-build-${{ needs.build.outputs.version || 'latest' }}
+    
+    - name: Run security scan
+      run: |
+        echo "Running basic security checks..."
+        
+        # Check for potential security issues
+        echo "🔍 Scanning for potential security issues..."
+        
+        # Check for direct file access protection
+        if ! grep -r "defined.*ABSPATH" wupz/ >/dev/null; then
+          echo "⚠️  Warning: Some files may be missing direct access protection"
+        else
+          echo "✅ Direct access protection found"
+        fi
+        
+        # Check for SQL injection patterns
+        if grep -r "\$_[A-Z].*\." wupz/ | grep -v "sanitize\|escape\|prepare" >/dev/null; then
+          echo "⚠️  Warning: Potential unsanitized input usage found"
+        else
+          echo "✅ No obvious unsanitized input usage"
+        fi
+        
+        # Check for XSS patterns
+        if grep -r "echo.*\$_" wupz/ | grep -v "esc_" >/dev/null; then
+          echo "⚠️  Warning: Potential XSS vulnerability found"
+        else
+          echo "✅ No obvious XSS vulnerabilities"
+        fi
+        
+        echo "🔒 Basic security scan completed" 

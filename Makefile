@@ -119,4 +119,22 @@ setup: build wp-setup wp-activate-plugin wp-create-content ## Complete setup: bu
 	@echo "🧪 To test the plugin:"
 	@echo "   1. Go to http://localhost:8080/wp-admin"
 	@echo "   2. Navigate to 'Wupz' in the admin menu"
-	@echo "   3. Create your first backup!" 
+	@echo "   3. Create your first backup!"
+
+# Landing Page Commands
+.PHONY: landing-dev landing-build landing-install landing-preview
+landing-install: ## Install landing page dependencies
+	@echo "Installing landing page dependencies..."
+	cd landingpage && pnpm install
+
+landing-dev: ## Start landing page development server
+	@echo "Starting landing page development server..."
+	cd landingpage && pnpm dev
+
+landing-build: ## Build landing page for production
+	@echo "Building landing page for production..."
+	cd landingpage && pnpm build
+
+landing-preview: ## Preview landing page production build
+	@echo "Previewing landing page production build..."
+	cd landingpage && pnpm preview 
