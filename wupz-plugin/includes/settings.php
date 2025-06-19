@@ -11,6 +11,29 @@ if (!defined('ABSPATH')) {
 class Wupz_Settings {
     
     /**
+     * Default settings
+     */
+    private $defaults = [
+        'max_backups' => 5,
+        'backup_database' => true,
+        'backup_files' => true,
+        'backup_schedule' => 'disabled',
+        'backup_time' => '02:00',
+        'backup_day' => 'sunday',
+        'email_notifications' => false,
+        'notification_email' => '',
+        'max_file_size' => 104857600, // 100MB in bytes
+        'exclude_patterns' => [
+            'cache/',
+            'tmp/',
+            'temp/',
+            '*.log',
+            '*.tmp',
+            'wupz-backups/'
+        ]
+    ];
+    
+    /**
      * Constructor
      */
     public function __construct() {
@@ -344,5 +367,168 @@ class Wupz_Settings {
             'email_notifications' => 0,
             'exclude_files' => "*.log\n*.tmp\ncache/*\ntmp/*"
         ));
+    }
+    
+    /**
+     * Get system status information
+     *
+     * @return array Status information with indicators
+     */
+    public function get_system_status() {
+        $status = [
+            'overall' => 'success', // success, warning, error
+            'checks' => []
+        ];
+        
+        // Check WordPress version
+        global $wp_version;
+        $min_wp_version = '5.0';
+        $wp_check = version_compare($wp_version, $min_wp_version, '>=');
+        $status['checks']['wordpress'] = [
+            'label' => 'WordPress Version',
+            'status' => $wp_check ? 'success' : 'error',
+            'message' => $wp_check ? 
+                sprintf('WordPress %s (✓ %s+)', $wp_version, $min_wp_version) :
+                sprintf('WordPress %s (✗ Requires %s+)', $wp_version, $min_wp_version),
+            'critical' => true
+        ];
+        
+        // Check PHP version
+        $min_php_version = '7.4';
+        $php_check = version_compare(PHP_VERSION, $min_php_version, '>=');
+        $status['checks']['php'] = [
+            'label' => 'PHP Version',
+            'status' => $php_check ? 'success' : 'error',
+            'message' => $php_check ?
+                sprintf('PHP %s (✓ %s+)', PHP_VERSION, $min_php_version) :
+                sprintf('PHP %s (✗ Requires %s+)', PHP_VERSION, $min_php_version),
+            'critical' => true
+        ];
+        
+        // Check ZipArchive extension
+        $zip_check = class_exists('ZipArchive');
+        $status['checks']['ziparchive'] = [
+            'label' => 'ZipArchive Extension',
+            'status' => $zip_check ? 'success' : 'error',
+            'message' => $zip_check ? 'Available ✓' : 'Not available ✗',
+            'critical' => true
+        ];
+        
+        // Check backup directory
+        $backup_dir = WP_CONTENT_DIR . '/wupz-backups/';
+        $dir_exists = is_dir($backup_dir);
+        $dir_writable = $dir_exists && is_writable($backup_dir);
+        $status['checks']['backup_directory'] = [
+            'label' => 'Backup Directory',
+            'status' => $dir_writable ? 'success' : ($dir_exists ? 'warning' : 'error'),
+            'message' => $dir_writable ? 
+                'Writable ✓' : 
+                ($dir_exists ? 'Exists but not writable ⚠' : 'Does not exist ✗'),
+            'critical' => true
+        ];
+        
+        // Check disk space
+        $free_space = disk_free_space(WP_CONTENT_DIR);
+        $free_space_gb = $free_space / (1024 * 1024 * 1024);
+        $space_status = $free_space_gb > 1 ? 'success' : ($free_space_gb > 0.5 ? 'warning' : 'error');
+        $status['checks']['disk_space'] = [
+            'label' => 'Available Disk Space',
+            'status' => $space_status,
+            'message' => sprintf('%.2f GB available', $free_space_gb),
+            'critical' => false
+        ];
+        
+        // Check memory limit
+        $memory_limit = wp_convert_hr_to_bytes(ini_get('memory_limit'));
+        $memory_limit_mb = $memory_limit / (1024 * 1024);
+        $memory_status = $memory_limit_mb >= 256 ? 'success' : ($memory_limit_mb >= 128 ? 'warning' : 'error');
+        $status['checks']['memory_limit'] = [
+            'label' => 'PHP Memory Limit',
+            'status' => $memory_status,
+            'message' => sprintf('%d MB %s', $memory_limit_mb, 
+                $memory_limit_mb >= 256 ? '✓' : ($memory_limit_mb >= 128 ? '⚠' : '✗')),
+            'critical' => false
+        ];
+        
+        // Check execution time limit
+        $max_execution_time = ini_get('max_execution_time');
+        $time_status = $max_execution_time == 0 || $max_execution_time >= 120 ? 'success' : 
+                      ($max_execution_time >= 60 ? 'warning' : 'error');
+        $status['checks']['execution_time'] = [
+            'label' => 'Max Execution Time',
+            'status' => $time_status,
+            'message' => $max_execution_time == 0 ? 
+                'Unlimited ✓' : 
+                sprintf('%d seconds %s', $max_execution_time,
+                    $max_execution_time >= 120 ? '✓' : ($max_execution_time >= 60 ? '⚠' : '✗')),
+            'critical' => false
+        ];
+        
+        // Check WordPress cron
+        $cron_disabled = defined('DISABLE_WP_CRON') && DISABLE_WP_CRON;
+        $status['checks']['wordpress_cron'] = [
+            'label' => 'WordPress Cron',
+            'status' => $cron_disabled ? 'warning' : 'success',
+            'message' => $cron_disabled ? 'Disabled ⚠' : 'Enabled ✓',
+            'critical' => false
+        ];
+        
+        // Determine overall status
+        $critical_errors = 0;
+        $warnings = 0;
+        
+        foreach ($status['checks'] as $check) {
+            if ($check['status'] === 'error' && $check['critical']) {
+                $critical_errors++;
+            } elseif ($check['status'] === 'warning' || ($check['status'] === 'error' && !$check['critical'])) {
+                $warnings++;
+            }
+        }
+        
+        if ($critical_errors > 0) {
+            $status['overall'] = 'error';
+        } elseif ($warnings > 0) {
+            $status['overall'] = 'warning';
+        }
+        
+        return $status;
+    }
+    
+    /**
+     * Get status indicator emoji
+     *
+     * @param string $status Status level
+     * @return string Emoji indicator
+     */
+    public function get_status_indicator($status) {
+        switch ($status) {
+            case 'success':
+                return '🟢';
+            case 'warning':
+                return '🟡';
+            case 'error':
+                return '🔴';
+            default:
+                return '⚪';
+        }
+    }
+    
+    /**
+     * Get status message
+     *
+     * @param string $status Status level
+     * @return string Status message
+     */
+    public function get_status_message($status) {
+        switch ($status) {
+            case 'success':
+                return __('All systems operational', 'wupz');
+            case 'warning':
+                return __('Warnings present', 'wupz');
+            case 'error':
+                return __('Critical issues detected', 'wupz');
+            default:
+                return __('Status unknown', 'wupz');
+        }
     }
 } 
