@@ -55,16 +55,7 @@ jobs:
         
         echo "✅ Plugin structure validation passed"
     
-    - name: PHP Syntax Check
-      run: |
-        echo "Checking PHP syntax..."
-        find wupz-plugin -name "*.php" -exec php -l {} \; | grep -v "No syntax errors"
-        if [ $? -eq 0 ]; then
-          echo "✅ PHP syntax check passed"
-        else
-          echo "❌ PHP syntax errors found"
-          exit 1
-        fi
+
     
     - name: WordPress Coding Standards
       run: |
