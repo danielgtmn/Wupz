@@ -95,29 +95,29 @@ jobs:
       run: |
         echo "Creating ZIP package..."
         cd build
-        zip -r "../wupz-${{ steps.version.outputs.version }}.zip" wupz/
+        zip -r "../wupz.zip" wupz/
         cd ..
         
         # Verify ZIP was created
-        if [ ! -f "wupz-${{ steps.version.outputs.version }}.zip" ]; then
+        if [ ! -f "wupz.zip" ]; then
           echo "❌ Failed to create ZIP package"
           exit 1
         fi
         
-        echo "✅ ZIP package created: wupz-${{ steps.version.outputs.version }}.zip"
-        echo "📦 Package size: $(du -h wupz-${{ steps.version.outputs.version }}.zip | cut -f1)"
+        echo "✅ ZIP package created: wupz.zip"
+        echo "📦 Package size: $(du -h wupz.zip | cut -f1)"
     
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
-        name: wupz-plugin-${{ steps.version.outputs.version }}
-        path: wupz-${{ steps.version.outputs.version }}.zip
+        name: wupz-plugin
+        path: wupz.zip
         retention-days: 30
     
     - name: Upload build directory artifact
       uses: actions/upload-artifact@v4
       with:
-        name: wupz-plugin-build-${{ steps.version.outputs.version }}
+        name: wupz-plugin-build
         path: build/
         retention-days: 7
 
@@ -140,7 +140,7 @@ jobs:
     - name: Download build artifact
       uses: actions/download-artifact@v4
       with:
-        name: wupz-plugin-${{ steps.version.outputs.version }}
+        name: wupz-plugin
         path: ./
     
     - name: Create Release
@@ -151,7 +151,7 @@ jobs:
           ## Wupz WordPress Backup Plugin v${{ steps.version.outputs.version }}
           
           ### Installation
-          1. Download the `wupz-${{ steps.version.outputs.version }}.zip` file below
+          1. Download the `wupz.zip` file below
           2. Go to WordPress Admin → Plugins → Add New → Upload Plugin
           3. Upload the ZIP file and activate the plugin
           
@@ -168,7 +168,7 @@ jobs:
           ---
           **Full Changelog**: https://github.com/danielgtmn/Wupz/commits/${{ github.ref_name }}
         files: |
-          wupz-${{ steps.version.outputs.version }}.zip
+          wupz.zip
         draft: false
         prerelease: false
 
