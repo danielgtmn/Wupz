@@ -4,6 +4,9 @@ on:
   push:
     tags: [ 'v*' ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build Plugin Package
@@ -141,13 +144,9 @@ jobs:
         path: ./
     
     - name: Create Release
-      uses: actions/create-release@v1
-      id: create_release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Wupz v${{ steps.version.outputs.version }}
+        name: Wupz v${{ steps.version.outputs.version }}
         body: |
           ## Wupz WordPress Backup Plugin v${{ steps.version.outputs.version }}
           
@@ -167,19 +166,11 @@ jobs:
           Visit our [Wiki](https://github.com/danielgtmn/Wupz/wiki) for detailed documentation.
           
           ---
-          **Full Changelog**: https://github.com/danielgtmn/Wupz/compare/v${{ steps.version.outputs.version }}
+          **Full Changelog**: https://github.com/danielgtmn/Wupz/commits/${{ github.ref_name }}
+        files: |
+          wupz-${{ steps.version.outputs.version }}.zip
         draft: false
         prerelease: false
-    
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./wupz-${{ steps.version.outputs.version }}.zip
-        asset_name: wupz-${{ steps.version.outputs.version }}.zip
-        asset_content_type: application/zip
 
 
 
