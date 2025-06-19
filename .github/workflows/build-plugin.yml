@@ -108,14 +108,14 @@ jobs:
         echo "📦 Package size: $(du -h wupz-${{ steps.version.outputs.version }}.zip | cut -f1)"
     
     - name: Upload build artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wupz-plugin-${{ steps.version.outputs.version }}
         path: wupz-${{ steps.version.outputs.version }}.zip
         retention-days: 30
     
     - name: Upload build directory artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: wupz-plugin-build-${{ steps.version.outputs.version }}
         path: build/
@@ -145,7 +145,7 @@ jobs:
         echo "Tag version: $TAG_VERSION"
     
     - name: Download build artifact
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: wupz-plugin-${{ steps.version.outputs.version }}
     
