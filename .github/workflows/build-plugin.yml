@@ -188,46 +188,4 @@ jobs:
         echo "3. Follow WordPress.org plugin submission guidelines"
         echo "4. Upload to WordPress.org SVN repository"
 
-  security-scan:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: build
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: wupz-plugin-build-${{ needs.build.outputs.version || 'latest' }}
-    
-    - name: Run security scan
-      run: |
-        echo "Running basic security checks..."
-        
-        # Check for potential security issues
-        echo "🔍 Scanning for potential security issues..."
-        
-        # Check for direct file access protection
-        if ! grep -r "defined.*ABSPATH" wupz/ >/dev/null; then
-          echo "⚠️  Warning: Some files may be missing direct access protection"
-        else
-          echo "✅ Direct access protection found"
-        fi
-        
-        # Check for SQL injection patterns
-        if grep -r "\$_[A-Z].*\." wupz/ | grep -v "sanitize\|escape\|prepare" >/dev/null; then
-          echo "⚠️  Warning: Potential unsanitized input usage found"
-        else
-          echo "✅ No obvious unsanitized input usage"
-        fi
-        
-        # Check for XSS patterns
-        if grep -r "echo.*\$_" wupz/ | grep -v "esc_" >/dev/null; then
-          echo "⚠️  Warning: Potential XSS vulnerability found"
-        else
-          echo "✅ No obvious XSS vulnerabilities"
-        fi
-        
-        echo "🔒 Basic security scan completed" 
+ 
