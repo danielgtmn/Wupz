@@ -417,7 +417,15 @@ class Wupz_Settings {
         // Check backup directory
         $backup_dir = WP_CONTENT_DIR . '/wupz-backups/';
         $dir_exists = is_dir($backup_dir);
-        $dir_writable = $dir_exists && is_writable($backup_dir);
+        
+        // Use WP_Filesystem to check writability
+        global $wp_filesystem;
+        if (!$wp_filesystem) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+        
+        $dir_writable = $dir_exists && $wp_filesystem->is_writable($backup_dir);
         $status['checks']['backup_directory'] = [
             'label' => 'Backup Directory',
             'status' => $dir_writable ? 'success' : ($dir_exists ? 'warning' : 'error'),

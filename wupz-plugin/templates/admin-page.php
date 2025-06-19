@@ -25,10 +25,10 @@ $system_status = $settings->get_system_status();
         <!-- System Status Section -->
         <div class="wupz-system-status-section">
             <div class="wupz-card">
-                <h2><?php _e('System Status', 'wupz'); ?></h2>
+                <h2><?php esc_html_e('System Status', 'wupz'); ?></h2>
                 
                 <div class="wupz-status-indicator">
-                    <span class="wupz-status-icon"><?php echo $settings->get_status_indicator($system_status['overall']); ?></span>
+                    <span class="wupz-status-icon"><?php echo esc_html($settings->get_status_indicator($system_status['overall'])); ?></span>
                     <span class="wupz-status-text wupz-status-<?php echo esc_attr($system_status['overall']); ?>">
                         <?php echo esc_html($settings->get_status_message($system_status['overall'])); ?>
                     </span>
@@ -36,7 +36,7 @@ $system_status = $settings->get_system_status();
                 
                 <?php if ($system_status['overall'] !== 'success'): ?>
                     <div class="wupz-status-details">
-                        <h4><?php _e('System Check Details:', 'wupz'); ?></h4>
+                        <h4><?php esc_html_e('System Check Details:', 'wupz'); ?></h4>
                         <ul class="wupz-status-list">
                             <?php foreach ($system_status['checks'] as $check): ?>
                                 <?php if ($check['status'] !== 'success'): ?>
