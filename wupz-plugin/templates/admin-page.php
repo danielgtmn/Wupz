@@ -55,14 +55,14 @@ $system_status = $settings->get_system_status();
         <!-- Backup Status Section -->
         <div class="wupz-status-section">
             <div class="wupz-card">
-                <h2><?php _e('Backup Status', 'wupz'); ?></h2>
+                <h2><?php esc_html_e('Backup Status', 'wupz'); ?></h2>
                 
                 <div class="wupz-status-grid">
                     <div class="wupz-status-item">
-                        <h3><?php _e('Last Backup', 'wupz'); ?></h3>
+                        <h3><?php esc_html_e('Last Backup', 'wupz'); ?></h3>
                         <?php if ($last_backup): ?>
                             <p class="wupz-status-value">
-                                <?php echo esc_html(date('Y-m-d H:i:s', $last_backup['timestamp'])); ?>
+                                <?php echo esc_html(wp_date('Y-m-d H:i:s', $last_backup['timestamp'])); ?>
                             </p>
                             <p class="wupz-status-meta">
                                 <span class="wupz-status-<?php echo esc_attr($last_backup['status']); ?>">
@@ -73,13 +73,13 @@ $system_status = $settings->get_system_status();
                                 <?php endif; ?>
                             </p>
                         <?php else: ?>
-                            <p class="wupz-status-value"><?php _e('Never', 'wupz'); ?></p>
-                            <p class="wupz-status-meta"><?php _e('No backups created yet', 'wupz'); ?></p>
+                            <p class="wupz-status-value"><?php esc_html_e('Never', 'wupz'); ?></p>
+                            <p class="wupz-status-meta"><?php esc_html_e('No backups created yet', 'wupz'); ?></p>
                         <?php endif; ?>
                     </div>
                     
                     <div class="wupz-status-item">
-                        <h3><?php _e('Next Scheduled Backup', 'wupz'); ?></h3>
+                        <h3><?php esc_html_e('Next Scheduled Backup', 'wupz'); ?></h3>
                         <p class="wupz-status-value">
                             <?php echo esc_html($schedule_info['next_backup_formatted']); ?>
                         </p>
@@ -87,13 +87,13 @@ $system_status = $settings->get_system_status();
                             <?php if ($schedule_info['is_scheduled']): ?>
                                 <span class="wupz-status-active"><?php echo esc_html(ucfirst($schedule_info['interval'])); ?> schedule</span>
                             <?php else: ?>
-                                <span class="wupz-status-inactive"><?php _e('Automatic backups disabled', 'wupz'); ?></span>
+                                <span class="wupz-status-inactive"><?php esc_html_e('Automatic backups disabled', 'wupz'); ?></span>
                             <?php endif; ?>
                         </p>
                     </div>
                     
                     <div class="wupz-status-item">
-                        <h3><?php _e('Total Backups', 'wupz'); ?></h3>
+                        <h3><?php esc_html_e('Total Backups', 'wupz'); ?></h3>
                         <p class="wupz-status-value"><?php echo count($backups); ?></p>
                         <p class="wupz-status-meta">
                                                     <?php 
@@ -105,7 +105,7 @@ $system_status = $settings->get_system_status();
                             $backup_helper = new Wupz_Backup();
                             echo esc_html($backup_helper->format_bytes($total_size));
                         } else {
-                            echo __('0 bytes', 'wupz');
+                            echo esc_html__('0 bytes', 'wupz');
                         }
                         ?>
                         </p>
@@ -117,20 +117,20 @@ $system_status = $settings->get_system_status();
         <!-- Manual Backup Section -->
         <div class="wupz-actions-section">
             <div class="wupz-card">
-                <h2><?php _e('Manual Backup', 'wupz'); ?></h2>
-                <p><?php _e('Create a backup of your WordPress site right now.', 'wupz'); ?></p>
+                <h2><?php esc_html_e('Manual Backup', 'wupz'); ?></h2>
+                <p><?php esc_html_e('Create a backup of your WordPress site right now.', 'wupz'); ?></p>
                 
                 <div class="wupz-backup-controls">
                     <button id="wupz-create-backup" class="button button-primary button-large">
                         <span class="dashicons dashicons-backup"></span>
-                        <?php _e('Create Backup Now', 'wupz'); ?>
+                        <?php esc_html_e('Create Backup Now', 'wupz'); ?>
                     </button>
                     
                     <div id="wupz-backup-progress" class="wupz-progress" style="display: none;">
                         <div class="wupz-progress-bar">
                             <div class="wupz-progress-fill"></div>
                         </div>
-                        <p class="wupz-progress-text"><?php _e('Creating backup...', 'wupz'); ?></p>
+                        <p class="wupz-progress-text"><?php esc_html_e('Creating backup...', 'wupz'); ?></p>
                     </div>
                 </div>
             </div>
@@ -139,17 +139,17 @@ $system_status = $settings->get_system_status();
         <!-- Backup List Section -->
         <div class="wupz-backups-section">
             <div class="wupz-card">
-                <h2><?php _e('Available Backups', 'wupz'); ?></h2>
+                <h2><?php esc_html_e('Available Backups', 'wupz'); ?></h2>
                 
                 <?php if (!empty($backups)): ?>
                     <div class="wupz-backups-table-wrap">
                         <table class="wp-list-table widefat fixed striped">
                             <thead>
                                 <tr>
-                                    <th scope="col"><?php _e('Backup File', 'wupz'); ?></th>
-                                    <th scope="col"><?php _e('Date Created', 'wupz'); ?></th>
-                                    <th scope="col"><?php _e('Size', 'wupz'); ?></th>
-                                    <th scope="col"><?php _e('Actions', 'wupz'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Backup File', 'wupz'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Date Created', 'wupz'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Size', 'wupz'); ?></th>
+                                    <th scope="col"><?php esc_html_e('Actions', 'wupz'); ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -166,16 +166,16 @@ $system_status = $settings->get_system_status();
                                         </td>
                                         <td>
                                             <div class="wupz-backup-actions">
-                                                <a href="<?php echo wp_nonce_url(admin_url('admin-ajax.php?action=wupz_download_backup&file=' . urlencode($backup['filename'])), 'wupz_nonce', 'nonce'); ?>" 
+                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-ajax.php?action=wupz_download_backup&file=' . urlencode($backup['filename'])), 'wupz_nonce', 'nonce')); ?>" 
                                                    class="button button-small">
                                                     <span class="dashicons dashicons-download"></span>
-                                                    <?php _e('Download', 'wupz'); ?>
+                                                    <?php esc_html_e('Download', 'wupz'); ?>
                                                 </a>
                                                 
                                                 <button class="button button-small wupz-delete-backup" 
                                                         data-filename="<?php echo esc_attr($backup['filename']); ?>">
                                                     <span class="dashicons dashicons-trash"></span>
-                                                    <?php _e('Delete', 'wupz'); ?>
+                                                    <?php esc_html_e('Delete', 'wupz'); ?>
                                                 </button>
                                             </div>
                                         </td>
@@ -187,8 +187,8 @@ $system_status = $settings->get_system_status();
                 <?php else: ?>
                     <div class="wupz-empty-state">
                         <span class="dashicons dashicons-backup"></span>
-                        <h3><?php _e('No backups found', 'wupz'); ?></h3>
-                        <p><?php _e('Create your first backup to get started.', 'wupz'); ?></p>
+                        <h3><?php esc_html_e('No backups found', 'wupz'); ?></h3>
+                        <p><?php esc_html_e('Create your first backup to get started.', 'wupz'); ?></p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -197,21 +197,21 @@ $system_status = $settings->get_system_status();
         <!-- Quick Settings Section -->
         <div class="wupz-quick-settings-section">
             <div class="wupz-card">
-                <h2><?php _e('Quick Settings', 'wupz'); ?></h2>
+                <h2><?php esc_html_e('Quick Settings', 'wupz'); ?></h2>
                 
                 <div class="wupz-quick-settings">
                     <div class="wupz-setting-item">
-                        <label for="wupz-quick-schedule"><?php _e('Backup Schedule:', 'wupz'); ?></label>
+                        <label for="wupz-quick-schedule"><?php esc_html_e('Backup Schedule:', 'wupz'); ?></label>
                         <select id="wupz-quick-schedule" class="wupz-quick-setting">
-                            <option value="disabled" <?php selected($schedule_info['interval'], 'disabled'); ?>><?php _e('Disabled', 'wupz'); ?></option>
-                            <option value="daily" <?php selected($schedule_info['interval'], 'daily'); ?>><?php _e('Daily', 'wupz'); ?></option>
-                            <option value="weekly" <?php selected($schedule_info['interval'], 'weekly'); ?>><?php _e('Weekly', 'wupz'); ?></option>
+                            <option value="disabled" <?php selected($schedule_info['interval'], 'disabled'); ?>><?php esc_html_e('Disabled', 'wupz'); ?></option>
+                            <option value="daily" <?php selected($schedule_info['interval'], 'daily'); ?>><?php esc_html_e('Daily', 'wupz'); ?></option>
+                            <option value="weekly" <?php selected($schedule_info['interval'], 'weekly'); ?>><?php esc_html_e('Weekly', 'wupz'); ?></option>
                         </select>
                     </div>
                     
                     <div class="wupz-setting-item">
-                        <a href="<?php echo admin_url('admin.php?page=wupz-settings'); ?>" class="button">
-                            <?php _e('More Settings', 'wupz'); ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=wupz-settings')); ?>" class="button">
+                            <?php esc_html_e('More Settings', 'wupz'); ?>
                         </a>
                     </div>
                 </div>

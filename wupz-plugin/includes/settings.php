@@ -133,21 +133,21 @@ class Wupz_Settings {
      * General section callback
      */
     public function general_section_callback() {
-        echo '<p>' . __('Configure general backup settings.', 'wupz') . '</p>';
+        echo '<p>' . esc_html__('Configure general backup settings.', 'wupz') . '</p>';
     }
     
     /**
      * Schedule section callback
      */
     public function schedule_section_callback() {
-        echo '<p>' . __('Configure automatic backup scheduling.', 'wupz') . '</p>';
+        echo '<p>' . esc_html__('Configure automatic backup scheduling.', 'wupz') . '</p>';
     }
     
     /**
      * Advanced section callback
      */
     public function advanced_section_callback() {
-        echo '<p>' . __('Advanced configuration options.', 'wupz') . '</p>';
+        echo '<p>' . esc_html__('Advanced configuration options.', 'wupz') . '</p>';
     }
     
     /**
@@ -158,7 +158,7 @@ class Wupz_Settings {
         $value = isset($settings['max_backups']) ? $settings['max_backups'] : 5;
         
         echo '<input type="number" name="wupz_settings[max_backups]" value="' . esc_attr($value) . '" min="0" max="50" />';
-        echo '<p class="description">' . __('Number of backup files to keep. Set to 0 to keep all backups.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('Number of backup files to keep. Set to 0 to keep all backups.', 'wupz') . '</p>';
     }
     
     /**
@@ -170,7 +170,7 @@ class Wupz_Settings {
         
         echo '<label>';
         echo '<input type="checkbox" name="wupz_settings[backup_database]" value="1" ' . checked(1, $value, false) . ' />';
-        echo ' ' . __('Include database in backups', 'wupz');
+        echo ' ' . esc_html__('Include database in backups', 'wupz');
         echo '</label>';
     }
     
@@ -183,9 +183,9 @@ class Wupz_Settings {
         
         echo '<label>';
         echo '<input type="checkbox" name="wupz_settings[backup_files]" value="1" ' . checked(1, $value, false) . ' />';
-        echo ' ' . __('Include files in backups', 'wupz');
+        echo ' ' . esc_html__('Include files in backups', 'wupz');
         echo '</label>';
-        echo '<p class="description">' . __('Includes the wp-content directory and its subdirectories.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('Includes the wp-content directory and its subdirectories.', 'wupz') . '</p>';
     }
     
     /**
@@ -206,7 +206,7 @@ class Wupz_Settings {
             echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>';
         }
         echo '</select>';
-        echo '<p class="description">' . __('How often to automatically create backups.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('How often to automatically create backups.', 'wupz') . '</p>';
     }
     
     /**
@@ -218,9 +218,9 @@ class Wupz_Settings {
         
         echo '<label>';
         echo '<input type="checkbox" name="wupz_settings[email_notifications]" value="1" ' . checked(1, $value, false) . ' />';
-        echo ' ' . __('Send email notifications when scheduled backups fail', 'wupz');
+        echo ' ' . esc_html__('Send email notifications when scheduled backups fail', 'wupz');
         echo '</label>';
-        echo '<p class="description">' . __('Notifications will be sent to the admin email address.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('Notifications will be sent to the admin email address.', 'wupz') . '</p>';
     }
     
     /**
@@ -231,7 +231,7 @@ class Wupz_Settings {
         $value = isset($settings['exclude_files']) ? $settings['exclude_files'] : "*.log\n*.tmp\ncache/*\ntmp/*";
         
         echo '<textarea name="wupz_settings[exclude_files]" rows="5" cols="50" class="regular-text">' . esc_textarea($value) . '</textarea>';
-        echo '<p class="description">' . __('File patterns to exclude from backups, one per line. Use * as wildcard.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('File patterns to exclude from backups, one per line. Use * as wildcard.', 'wupz') . '</p>';
     }
     
     /**
@@ -284,7 +284,7 @@ class Wupz_Settings {
      */
     public function display_settings_page() {
         if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'wupz'));
+            wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'wupz'));
         }
         
         // Handle settings form submission
@@ -299,9 +299,9 @@ class Wupz_Settings {
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
             
-            <?php if (isset($_GET['settings-updated']) && $_GET['settings-updated']): ?>
+            <?php if (isset($_GET['settings-updated']) && sanitize_text_field(wp_unslash($_GET['settings-updated']))): ?>
                 <div class="notice notice-success is-dismissible">
-                    <p><?php _e('Settings saved successfully.', 'wupz'); ?></p>
+                    <p><?php esc_html_e('Settings saved successfully.', 'wupz'); ?></p>
                 </div>
             <?php endif; ?>
             
@@ -318,26 +318,26 @@ class Wupz_Settings {
                 
                 <div class="wupz-settings-sidebar">
                     <div class="wupz-info-box">
-                        <h3><?php _e('Current Schedule', 'wupz'); ?></h3>
-                        <p><strong><?php _e('Interval:', 'wupz'); ?></strong> <?php echo esc_html(ucfirst($schedule_info['interval'])); ?></p>
-                        <p><strong><?php _e('Next Backup:', 'wupz'); ?></strong> <?php echo esc_html($schedule_info['next_backup_formatted']); ?></p>
+                        <h3><?php esc_html_e('Current Schedule', 'wupz'); ?></h3>
+                        <p><strong><?php esc_html_e('Interval:', 'wupz'); ?></strong> <?php echo esc_html(ucfirst($schedule_info['interval'])); ?></p>
+                        <p><strong><?php esc_html_e('Next Backup:', 'wupz'); ?></strong> <?php echo esc_html($schedule_info['next_backup_formatted']); ?></p>
                         <?php if ($schedule_info['is_scheduled']): ?>
-                            <p class="wupz-status-active"><?php _e('Automatic backups are active', 'wupz'); ?></p>
+                            <p class="wupz-status-active"><?php esc_html_e('Automatic backups are active', 'wupz'); ?></p>
                         <?php else: ?>
-                            <p class="wupz-status-inactive"><?php _e('Automatic backups are disabled', 'wupz'); ?></p>
+                            <p class="wupz-status-inactive"><?php esc_html_e('Automatic backups are disabled', 'wupz'); ?></p>
                         <?php endif; ?>
                     </div>
                     
                     <div class="wupz-info-box">
-                        <h3><?php _e('Backup Location', 'wupz'); ?></h3>
+                        <h3><?php esc_html_e('Backup Location', 'wupz'); ?></h3>
                         <p><?php echo esc_html(str_replace(ABSPATH, '', WUPZ_BACKUP_DIR)); ?></p>
-                        <p class="description"><?php _e('Backup files are stored in this directory relative to your WordPress root.', 'wupz'); ?></p>
+                        <p class="description"><?php esc_html_e('Backup files are stored in this directory relative to your WordPress root.', 'wupz'); ?></p>
                     </div>
                     
                     <div class="wupz-info-box">
-                        <h3><?php _e('Support', 'wupz'); ?></h3>
-                        <p><?php _e('Need help with Wupz? Check out our documentation or contact support.', 'wupz'); ?></p>
-                        <a href="#" class="button button-secondary"><?php _e('Documentation', 'wupz'); ?></a>
+                        <h3><?php esc_html_e('Support', 'wupz'); ?></h3>
+                        <p><?php esc_html_e('Need help with Wupz? Check out our documentation or contact support.', 'wupz'); ?></p>
+                        <a href="#" class="button button-secondary"><?php esc_html_e('Documentation', 'wupz'); ?></a>
                     </div>
                 </div>
             </div>
