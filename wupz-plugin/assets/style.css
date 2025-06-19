@@ -1,0 +1,350 @@
+/**
+ * Wupz Admin Styles
+ * Styling for the backup plugin admin interface
+ */
+
+/* Main Admin Layout */
+.wupz-admin-wrap {
+    max-width: 1200px;
+    margin: 20px 0;
+}
+
+.wupz-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    margin-bottom: 20px;
+    padding: 20px;
+}
+
+.wupz-card h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    color: #23282d;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* Status Section */
+.wupz-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wupz-status-item {
+    text-align: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 4px solid #0073aa;
+}
+
+.wupz-status-item h3 {
+    margin: 0 0 10px;
+    color: #666;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.wupz-status-value {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0 0 5px;
+    color: #23282d;
+}
+
+.wupz-status-meta {
+    font-size: 12px;
+    color: #666;
+    margin: 0;
+}
+
+.wupz-status-completed {
+    color: #46b450;
+}
+
+.wupz-status-failed {
+    color: #dc3232;
+}
+
+.wupz-status-active {
+    color: #46b450;
+    font-weight: 600;
+}
+
+.wupz-status-inactive {
+    color: #999;
+}
+
+/* Backup Controls */
+.wupz-backup-controls {
+    text-align: center;
+    margin-top: 20px;
+}
+
+#wupz-create-backup {
+    font-size: 16px;
+    padding: 10px 20px;
+    height: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#wupz-create-backup .dashicons {
+    font-size: 18px;
+}
+
+/* Progress Bar */
+.wupz-progress {
+    margin-top: 20px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.wupz-progress-bar {
+    background: #f0f0f1;
+    border-radius: 10px;
+    height: 20px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.wupz-progress-fill {
+    background: linear-gradient(90deg, #0073aa, #005177);
+    height: 100%;
+    width: 0;
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.wupz-progress-text {
+    text-align: center;
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+/* Backup Table */
+.wupz-backups-table-wrap {
+    margin-top: 15px;
+}
+
+.wupz-backup-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.wupz-backup-actions .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.wupz-backup-actions .dashicons {
+    font-size: 14px;
+}
+
+/* Empty State */
+.wupz-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.wupz-empty-state .dashicons {
+    font-size: 48px;
+    color: #ddd;
+    margin-bottom: 20px;
+}
+
+.wupz-empty-state h3 {
+    margin: 0 0 10px;
+    color: #666;
+}
+
+.wupz-empty-state p {
+    margin: 0;
+    font-style: italic;
+}
+
+/* Quick Settings */
+.wupz-quick-settings {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.wupz-setting-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wupz-setting-item label {
+    font-weight: 600;
+    margin: 0;
+}
+
+/* Settings Page Layout */
+.wupz-settings-wrap {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wupz-settings-main {
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.wupz-settings-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.wupz-info-box {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.wupz-info-box h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #23282d;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.wupz-info-box p {
+    margin: 5px 0;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.wupz-info-box .description {
+    color: #666;
+    font-style: italic;
+}
+
+/* Form Styling */
+.wupz-settings-wrap .form-table th {
+    width: 200px;
+    padding: 15px 10px 15px 0;
+}
+
+.wupz-settings-wrap .form-table td {
+    padding: 15px 10px;
+}
+
+/* Messages */
+#wupz-messages .notice {
+    margin: 15px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .wupz-settings-wrap {
+        grid-template-columns: 1fr;
+    }
+    
+    .wupz-status-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .wupz-quick-settings {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .wupz-backup-actions {
+        flex-direction: column;
+    }
+    
+    .wupz-backup-actions .button {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .wupz-admin-wrap {
+        margin: 10px 0;
+    }
+    
+    .wupz-card {
+        padding: 15px;
+    }
+}
+
+/* Animation for status changes */
+.wupz-status-item {
+    transition: border-color 0.3s ease;
+}
+
+.wupz-status-item.success {
+    border-left-color: #46b450;
+}
+
+.wupz-status-item.error {
+    border-left-color: #dc3232;
+}
+
+/* Loading states */
+.wupz-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.wupz-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: wupz-spin 1s linear infinite;
+}
+
+@keyframes wupz-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Accessibility improvements */
+.wupz-backup-actions .button:focus,
+#wupz-create-backup:focus {
+    box-shadow: 0 0 0 2px #0073aa;
+    outline: none;
+}
+
+/* Print styles */
+@media print {
+    .wupz-backup-actions,
+    #wupz-create-backup,
+    .wupz-progress {
+        display: none !important;
+    }
+} 

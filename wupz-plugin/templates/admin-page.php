@@ -1,0 +1,308 @@
+<?php
+/**
+ * Wupz Admin Page Template
+ * Main backup management interface
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+$schedule = new Wupz_Schedule();
+$schedule_info = $schedule->get_schedule_info();
+?>
+
+<div class="wrap">
+    <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+    
+    <div id="wupz-messages"></div>
+    
+    <div class="wupz-admin-wrap">
+        <!-- Backup Status Section -->
+        <div class="wupz-status-section">
+            <div class="wupz-card">
+                <h2><?php _e('Backup Status', 'wupz'); ?></h2>
+                
+                <div class="wupz-status-grid">
+                    <div class="wupz-status-item">
+                        <h3><?php _e('Last Backup', 'wupz'); ?></h3>
+                        <?php if ($last_backup): ?>
+                            <p class="wupz-status-value">
+                                <?php echo esc_html(date('Y-m-d H:i:s', $last_backup['timestamp'])); ?>
+                            </p>
+                            <p class="wupz-status-meta">
+                                <span class="wupz-status-<?php echo esc_attr($last_backup['status']); ?>">
+                                    <?php echo esc_html(ucfirst($last_backup['status'])); ?>
+                                </span>
+                                <?php if (isset($last_backup['filename'])): ?>
+                                    - <?php echo esc_html($last_backup['filename']); ?>
+                                <?php endif; ?>
+                            </p>
+                        <?php else: ?>
+                            <p class="wupz-status-value"><?php _e('Never', 'wupz'); ?></p>
+                            <p class="wupz-status-meta"><?php _e('No backups created yet', 'wupz'); ?></p>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="wupz-status-item">
+                        <h3><?php _e('Next Scheduled Backup', 'wupz'); ?></h3>
+                        <p class="wupz-status-value">
+                            <?php echo esc_html($schedule_info['next_backup_formatted']); ?>
+                        </p>
+                        <p class="wupz-status-meta">
+                            <?php if ($schedule_info['is_scheduled']): ?>
+                                <span class="wupz-status-active"><?php echo esc_html(ucfirst($schedule_info['interval'])); ?> schedule</span>
+                            <?php else: ?>
+                                <span class="wupz-status-inactive"><?php _e('Automatic backups disabled', 'wupz'); ?></span>
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                    
+                    <div class="wupz-status-item">
+                        <h3><?php _e('Total Backups', 'wupz'); ?></h3>
+                        <p class="wupz-status-value"><?php echo count($backups); ?></p>
+                        <p class="wupz-status-meta">
+                                                    <?php 
+                        if (!empty($backups)) {
+                            $total_size = 0;
+                            foreach ($backups as $backup) {
+                                $total_size += filesize(WUPZ_BACKUP_DIR . $backup['filename']);
+                            }
+                            $backup_helper = new Wupz_Backup();
+                            echo esc_html($backup_helper->format_bytes($total_size));
+                        } else {
+                            echo __('0 bytes', 'wupz');
+                        }
+                        ?>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Manual Backup Section -->
+        <div class="wupz-actions-section">
+            <div class="wupz-card">
+                <h2><?php _e('Manual Backup', 'wupz'); ?></h2>
+                <p><?php _e('Create a backup of your WordPress site right now.', 'wupz'); ?></p>
+                
+                <div class="wupz-backup-controls">
+                    <button id="wupz-create-backup" class="button button-primary button-large">
+                        <span class="dashicons dashicons-backup"></span>
+                        <?php _e('Create Backup Now', 'wupz'); ?>
+                    </button>
+                    
+                    <div id="wupz-backup-progress" class="wupz-progress" style="display: none;">
+                        <div class="wupz-progress-bar">
+                            <div class="wupz-progress-fill"></div>
+                        </div>
+                        <p class="wupz-progress-text"><?php _e('Creating backup...', 'wupz'); ?></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Backup List Section -->
+        <div class="wupz-backups-section">
+            <div class="wupz-card">
+                <h2><?php _e('Available Backups', 'wupz'); ?></h2>
+                
+                <?php if (!empty($backups)): ?>
+                    <div class="wupz-backups-table-wrap">
+                        <table class="wp-list-table widefat fixed striped">
+                            <thead>
+                                <tr>
+                                    <th scope="col"><?php _e('Backup File', 'wupz'); ?></th>
+                                    <th scope="col"><?php _e('Date Created', 'wupz'); ?></th>
+                                    <th scope="col"><?php _e('Size', 'wupz'); ?></th>
+                                    <th scope="col"><?php _e('Actions', 'wupz'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($backups as $backup): ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo esc_html($backup['filename']); ?></strong>
+                                        </td>
+                                        <td>
+                                            <?php echo esc_html($backup['date_formatted']); ?>
+                                        </td>
+                                        <td>
+                                            <?php echo esc_html($backup['size']); ?>
+                                        </td>
+                                        <td>
+                                            <div class="wupz-backup-actions">
+                                                <a href="<?php echo wp_nonce_url(admin_url('admin-ajax.php?action=wupz_download_backup&file=' . urlencode($backup['filename'])), 'wupz_nonce', 'nonce'); ?>" 
+                                                   class="button button-small">
+                                                    <span class="dashicons dashicons-download"></span>
+                                                    <?php _e('Download', 'wupz'); ?>
+                                                </a>
+                                                
+                                                <button class="button button-small wupz-delete-backup" 
+                                                        data-filename="<?php echo esc_attr($backup['filename']); ?>">
+                                                    <span class="dashicons dashicons-trash"></span>
+                                                    <?php _e('Delete', 'wupz'); ?>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="wupz-empty-state">
+                        <span class="dashicons dashicons-backup"></span>
+                        <h3><?php _e('No backups found', 'wupz'); ?></h3>
+                        <p><?php _e('Create your first backup to get started.', 'wupz'); ?></p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <!-- Quick Settings Section -->
+        <div class="wupz-quick-settings-section">
+            <div class="wupz-card">
+                <h2><?php _e('Quick Settings', 'wupz'); ?></h2>
+                
+                <div class="wupz-quick-settings">
+                    <div class="wupz-setting-item">
+                        <label for="wupz-quick-schedule"><?php _e('Backup Schedule:', 'wupz'); ?></label>
+                        <select id="wupz-quick-schedule" class="wupz-quick-setting">
+                            <option value="disabled" <?php selected($schedule_info['interval'], 'disabled'); ?>><?php _e('Disabled', 'wupz'); ?></option>
+                            <option value="daily" <?php selected($schedule_info['interval'], 'daily'); ?>><?php _e('Daily', 'wupz'); ?></option>
+                            <option value="weekly" <?php selected($schedule_info['interval'], 'weekly'); ?>><?php _e('Weekly', 'wupz'); ?></option>
+                        </select>
+                    </div>
+                    
+                    <div class="wupz-setting-item">
+                        <a href="<?php echo admin_url('admin.php?page=wupz-settings'); ?>" class="button">
+                            <?php _e('More Settings', 'wupz'); ?>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+jQuery(document).ready(function($) {
+    
+    // Format bytes helper function
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    // Handle manual backup
+    $('#wupz-create-backup').on('click', function(e) {
+        e.preventDefault();
+        
+        const $button = $(this);
+        const $progress = $('#wupz-backup-progress');
+        const $messages = $('#wupz-messages');
+        
+        // Disable button and show progress
+        $button.prop('disabled', true);
+        $progress.show();
+        $messages.empty();
+        
+        // Start progress animation
+        let progress = 0;
+        const progressInterval = setInterval(function() {
+            progress += Math.random() * 15;
+            if (progress > 90) progress = 90;
+            $('.wupz-progress-fill').css('width', progress + '%');
+        }, 500);
+        
+        // Make AJAX request
+        $.post(wupz_ajax.ajax_url, {
+            action: 'wupz_manual_backup',
+            nonce: wupz_ajax.nonce
+        }, function(response) {
+            clearInterval(progressInterval);
+            $('.wupz-progress-fill').css('width', '100%');
+            
+            setTimeout(function() {
+                $progress.hide();
+                $button.prop('disabled', false);
+                
+                if (response.success) {
+                    $messages.html('<div class="notice notice-success is-dismissible"><p>' + response.data.message + '</p></div>');
+                    // Reload page to update backup list
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    $messages.html('<div class="notice notice-error is-dismissible"><p>' + response.data.message + '</p></div>');
+                }
+            }, 500);
+        }).fail(function() {
+            clearInterval(progressInterval);
+            $progress.hide();
+            $button.prop('disabled', false);
+            $messages.html('<div class="notice notice-error is-dismissible"><p>' + wupz_ajax.strings.backup_failed + '</p></div>');
+        });
+    });
+    
+    // Handle backup deletion
+    $('.wupz-delete-backup').on('click', function(e) {
+        e.preventDefault();
+        
+        if (!confirm(wupz_ajax.strings.confirm_delete)) {
+            return;
+        }
+        
+        const $button = $(this);
+        const filename = $button.data('filename');
+        const $row = $button.closest('tr');
+        
+        $button.prop('disabled', true);
+        
+        $.post(wupz_ajax.ajax_url, {
+            action: 'wupz_delete_backup',
+            file: filename,
+            nonce: wupz_ajax.nonce
+        }, function(response) {
+            if (response.success) {
+                $row.fadeOut(function() {
+                    $row.remove();
+                    
+                    // Check if table is empty
+                    if ($('.wupz-backups-table-wrap tbody tr').length === 0) {
+                        $('.wupz-backups-table-wrap').html('<div class="wupz-empty-state"><span class="dashicons dashicons-backup"></span><h3>No backups found</h3><p>Create your first backup to get started.</p></div>');
+                    }
+                });
+            } else {
+                $('#wupz-messages').html('<div class="notice notice-error is-dismissible"><p>Failed to delete backup.</p></div>');
+                $button.prop('disabled', false);
+            }
+        }).fail(function() {
+            $('#wupz-messages').html('<div class="notice notice-error is-dismissible"><p>Failed to delete backup.</p></div>');
+            $button.prop('disabled', false);
+        });
+    });
+    
+    // Handle quick schedule change
+    $('#wupz-quick-schedule').on('change', function() {
+        const schedule = $(this).val();
+        
+        $.post(wupz_ajax.ajax_url, {
+            action: 'wupz_update_schedule',
+            schedule: schedule,
+            nonce: wupz_ajax.nonce
+        }, function(response) {
+            if (response.success) {
+                $('#wupz-messages').html('<div class="notice notice-success is-dismissible"><p>Schedule updated successfully.</p></div>');
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            }
+        });
+    });
+});
+</script> 

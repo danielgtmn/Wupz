@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # WordPress with PHP 8.1
+  wordpress:
+    image: wordpress:6.4-php8.1-apache
+    container_name: wupz_wordpress
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_password
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_DEBUG', true);
+        define('WP_DEBUG_LOG', true);
+        define('WP_DEBUG_DISPLAY', false);
+        define('SCRIPT_DEBUG', true);
+        ini_set('memory_limit', '512M');
+        ini_set('max_execution_time', 300);
+        ini_set('upload_max_filesize', '100M');
+        ini_set('post_max_size', '100M');
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wupz-plugin:/var/www/html/wp-content/plugins/wupz
+      - ./uploads:/var/www/html/wp-content/uploads
+    depends_on:
+      - mysql
+    networks:
+      - wupz_network
+
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: wupz_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress_password
+      MYSQL_ROOT_PASSWORD: root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wupz_network
+
+  # phpMyAdmin for database management
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: wupz_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root_password
+    depends_on:
+      - mysql
+    networks:
+      - wupz_network
+
+  # WP-CLI for WordPress management
+  wp-cli:
+    image: wordpress:cli-php8.1
+    container_name: wupz_wp_cli
+    restart: "no"
+    volumes:
+      - wordpress_data:/var/www/html
+      - ./wupz-plugin:/var/www/html/wp-content/plugins/wupz
+    environment:
+      WORDPRESS_DB_HOST: mysql:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_password
+      WORDPRESS_DB_NAME: wordpress
+    depends_on:
+      - mysql
+      - wordpress
+    networks:
+      - wupz_network
+
+volumes:
+  wordpress_data:
+  mysql_data:
+
+networks:
+  wupz_network:
+    driver: bridge 
