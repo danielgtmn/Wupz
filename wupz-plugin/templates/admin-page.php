@@ -10,6 +10,10 @@ if (!defined('ABSPATH')) {
 
 $schedule = new Wupz_Schedule();
 $schedule_info = $schedule->get_schedule_info();
+
+// Get system status
+$settings = new Wupz_Settings();
+$system_status = $settings->get_system_status();
 ?>
 
 <div class="wrap">
@@ -18,6 +22,36 @@ $schedule_info = $schedule->get_schedule_info();
     <div id="wupz-messages"></div>
     
     <div class="wupz-admin-wrap">
+        <!-- System Status Section -->
+        <div class="wupz-system-status-section">
+            <div class="wupz-card">
+                <h2><?php _e('System Status', 'wupz'); ?></h2>
+                
+                <div class="wupz-status-indicator">
+                    <span class="wupz-status-icon"><?php echo $settings->get_status_indicator($system_status['overall']); ?></span>
+                    <span class="wupz-status-text wupz-status-<?php echo esc_attr($system_status['overall']); ?>">
+                        <?php echo esc_html($settings->get_status_message($system_status['overall'])); ?>
+                    </span>
+                </div>
+                
+                <?php if ($system_status['overall'] !== 'success'): ?>
+                    <div class="wupz-status-details">
+                        <h4><?php _e('System Check Details:', 'wupz'); ?></h4>
+                        <ul class="wupz-status-list">
+                            <?php foreach ($system_status['checks'] as $check): ?>
+                                <?php if ($check['status'] !== 'success'): ?>
+                                    <li class="wupz-status-item wupz-status-<?php echo esc_attr($check['status']); ?>">
+                                        <strong><?php echo esc_html($check['label']); ?>:</strong>
+                                        <?php echo esc_html($check['message']); ?>
+                                    </li>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
         <!-- Backup Status Section -->
         <div class="wupz-status-section">
             <div class="wupz-card">

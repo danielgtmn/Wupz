@@ -1,10 +1,10 @@
 <?php
 /**
  * Plugin Name: Wupz
- * Plugin URI: https://github.com/yourusername/wupz
+ * Plugin URI: https://wupz.org
  * Description: A comprehensive WordPress backup plugin that allows manual and scheduled backups of your database and files.
- * Version: 1.0.0
- * Author: Your Name
+ * Version: 0.0.1
+ * Author: Daniel Gietmann
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: wupz
