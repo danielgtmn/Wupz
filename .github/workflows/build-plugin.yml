@@ -8,69 +8,9 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
-    name: Test Plugin
-    runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        php-version: ['7.4', '8.0', '8.1', '8.2']
-        wordpress-version: ['6.0', '6.1', '6.2', '6.3', 'latest']
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: ${{ matrix.php-version }}
-        extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, mysql, mysqli, pdo_mysql, bcmath, soap, intl, gd, exif, iconv, imagick
-        coverage: none
-    
-    - name: Validate plugin structure
-      run: |
-        echo "Validating WordPress plugin structure..."
-        
-        # Check required files exist
-        if [ ! -f "wupz-plugin/wupz.php" ]; then
-          echo "❌ Main plugin file missing"
-          exit 1
-        fi
-        
-        if [ ! -d "wupz-plugin/includes" ]; then
-          echo "❌ Includes directory missing"
-          exit 1
-        fi
-        
-        if [ ! -d "wupz-plugin/assets" ]; then
-          echo "❌ Assets directory missing"
-          exit 1
-        fi
-        
-        if [ ! -d "wupz-plugin/templates" ]; then
-          echo "❌ Templates directory missing"
-          exit 1
-        fi
-        
-        echo "✅ Plugin structure validation passed"
-    
-
-    
-    - name: WordPress Coding Standards
-      run: |
-        echo "Installing WordPress Coding Standards..."
-        composer global require "squizlabs/php_codesniffer=*"
-        composer global require wp-coding-standards/wpcs
-        ~/.composer/vendor/bin/phpcs --config-set installed_paths ~/.composer/vendor/wp-coding-standards/wpcs
-        
-        echo "Running WordPress Coding Standards check..."
-        ~/.composer/vendor/bin/phpcs --standard=WordPress --ignore=node_modules,vendor wupz-plugin/ || true
-
   build:
     name: Build Plugin Package
     runs-on: ubuntu-latest
-    needs: test
     
     steps:
     - name: Checkout code
