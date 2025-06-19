@@ -26,7 +26,7 @@ class Wupz_Backup {
                 wp_mkdir_p(WUPZ_BACKUP_DIR);
             }
             
-            $timestamp = date('Y-m-d_H-i-s');
+            $timestamp = current_time('Y-m-d_H-i-s');
             $backup_filename = "wupz-backup-{$timestamp}.zip";
             $backup_path = WUPZ_BACKUP_DIR . $backup_filename;
             
@@ -59,7 +59,7 @@ class Wupz_Backup {
             
             // Clean up temporary database file
             if (isset($db_export['file']) && file_exists($db_export['file'])) {
-                unlink($db_export['file']);
+                wp_delete_file($db_export['file']);
             }
             
             // Clean up old backups
@@ -81,8 +81,11 @@ class Wupz_Backup {
             );
             
         } catch (Exception $e) {
-            // Log error
-            error_log('Wupz Backup Error: ' . $e->getMessage());
+            // Log error using WordPress debugging
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Only logs in debug mode
+                error_log('Wupz Backup Error: ' . $e->getMessage());
+            }
             
             return array(
                 'success' => false,
@@ -100,22 +103,33 @@ class Wupz_Backup {
         global $wpdb;
         
         try {
-            $temp_file = WUPZ_BACKUP_DIR . 'temp_database_' . time() . '.sql';
-            $handle = fopen($temp_file, 'w');
+            // Initialize WordPress filesystem
+            if (!function_exists('WP_Filesystem')) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+            }
             
-            if (!$handle) {
+            $creds = request_filesystem_credentials('', '', false, false, array());
+            if (!WP_Filesystem($creds)) {
                 return array(
                     'success' => false,
-                    'message' => __('Failed to create database export file', 'wupz')
+                    'message' => __('Failed to initialize filesystem', 'wupz')
                 );
             }
             
+            global $wp_filesystem;
+            
+            $temp_file = WUPZ_BACKUP_DIR . 'temp_database_' . time() . '.sql';
+            
+            // Create content string instead of direct file operations
+            $content = '';
+            
             // Write header
-            fwrite($handle, "-- Wupz Database Backup\n");
-            fwrite($handle, "-- Generated on: " . date('Y-m-d H:i:s') . "\n");
-            fwrite($handle, "-- WordPress Version: " . get_bloginfo('version') . "\n\n");
+            $content .= "-- Wupz Database Backup\n";
+            $content .= "-- Generated on: " . current_time('Y-m-d H:i:s') . "\n";
+            $content .= "-- WordPress Version: " . get_bloginfo('version') . "\n\n";
             
             // Get all tables
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Required for database backup functionality
             $tables = $wpdb->get_results('SHOW TABLES', ARRAY_N);
             
             foreach ($tables as $table) {
@@ -126,17 +140,20 @@ class Wupz_Backup {
                     continue;
                 }
                 
-                // Get table structure
-                $create_table = $wpdb->get_row("SHOW CREATE TABLE `{$table_name}`", ARRAY_N);
-                fwrite($handle, "\n-- Table structure for table `{$table_name}`\n");
-                fwrite($handle, "DROP TABLE IF EXISTS `{$table_name}`;\n");
-                fwrite($handle, $create_table[1] . ";\n\n");
+                // Get table structure (escape table name for security)
+                $escaped_table_name = esc_sql($table_name);
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange -- Table names cannot be parameterized, required for backup
+                $create_table = $wpdb->get_row("SHOW CREATE TABLE `{$escaped_table_name}`", ARRAY_N);
+                $content .= "\n-- Table structure for table `{$table_name}`\n";
+                $content .= "DROP TABLE IF EXISTS `{$table_name}`;\n";
+                $content .= $create_table[1] . ";\n\n";
                 
                 // Get table data
-                $rows = $wpdb->get_results("SELECT * FROM `{$table_name}`", ARRAY_A);
+                // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Table names cannot be parameterized, required for backup
+                $rows = $wpdb->get_results("SELECT * FROM `{$escaped_table_name}`", ARRAY_A);
                 
                 if (!empty($rows)) {
-                    fwrite($handle, "-- Dumping data for table `{$table_name}`\n");
+                    $content .= "-- Dumping data for table `{$table_name}`\n";
                     
                     foreach ($rows as $row) {
                         $values = array();
@@ -147,13 +164,19 @@ class Wupz_Backup {
                                 $values[] = "'" . $wpdb->_real_escape($value) . "'";
                             }
                         }
-                        fwrite($handle, "INSERT INTO `{$table_name}` VALUES (" . implode(',', $values) . ");\n");
+                        $content .= "INSERT INTO `{$table_name}` VALUES (" . implode(',', $values) . ");\n";
                     }
-                    fwrite($handle, "\n");
+                    $content .= "\n";
                 }
             }
             
-            fclose($handle);
+            // Write content to file using WP_Filesystem
+            if (!$wp_filesystem->put_contents($temp_file, $content, FS_CHMOD_FILE)) {
+                return array(
+                    'success' => false,
+                    'message' => __('Failed to write database export file', 'wupz')
+                );
+            }
             
             return array(
                 'success' => true,
@@ -259,7 +282,7 @@ class Wupz_Backup {
                     'filename' => $file,
                     'size' => $this->format_bytes(filesize($file_path)),
                     'date' => filemtime($file_path),
-                    'date_formatted' => date('Y-m-d H:i:s', filemtime($file_path))
+                    'date_formatted' => get_date_from_gmt(gmdate('Y-m-d H:i:s', filemtime($file_path)), 'Y-m-d H:i:s')
                 );
             }
         }
@@ -282,7 +305,7 @@ class Wupz_Backup {
         $file_path = WUPZ_BACKUP_DIR . sanitize_file_name($filename);
         
         if (file_exists($file_path) && preg_match('/^wupz-backup-(.+)\.zip$/', $filename)) {
-            return unlink($file_path);
+            return wp_delete_file($file_path);
         }
         
         return false;

@@ -83,7 +83,10 @@ class Wupz_Schedule {
             $last_backup_info['error'] = $result['message'];
             
             // Log error for debugging
-            error_log('Wupz Scheduled Backup Failed: ' . $result['message']);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Only logs in debug mode
+                error_log('Wupz Scheduled Backup Failed: ' . $result['message']);
+            }
             
             // Send email notification to admin if backup fails
             $this->send_backup_failure_notification($result['message']);
@@ -109,10 +112,12 @@ class Wupz_Schedule {
         $site_name = get_bloginfo('name');
         $site_url = get_site_url();
         
+        /* translators: %s: Site name */
         $subject = sprintf(__('[%s] Backup Failed', 'wupz'), $site_name);
         
+        /* translators: %1$s: Site URL, %2$s: Error message, %3$s: Admin URL */
         $message = sprintf(
-            __("Hello,\n\nThe scheduled backup for your WordPress site %s has failed.\n\nError message: %s\n\nPlease check your Wupz backup settings and try running a manual backup.\n\nYou can access the Wupz backup plugin at: %s\n\nRegards,\nWupz Backup Plugin", 'wupz'),
+            __("Hello,\n\nThe scheduled backup for your WordPress site %1\$s has failed.\n\nError message: %2\$s\n\nPlease check your Wupz backup settings and try running a manual backup.\n\nYou can access the Wupz backup plugin at: %3\$s\n\nRegards,\nWupz Backup Plugin", 'wupz'),
             $site_url,
             $error_message,
             admin_url('admin.php?page=wupz')
@@ -143,7 +148,7 @@ class Wupz_Schedule {
         return array(
             'interval' => $schedule_interval,
             'next_backup' => $next_backup,
-            'next_backup_formatted' => $next_backup ? date('Y-m-d H:i:s', $next_backup) : __('Not scheduled', 'wupz'),
+            'next_backup_formatted' => $next_backup ? wp_date('Y-m-d H:i:s', $next_backup) : __('Not scheduled', 'wupz'),
             'is_scheduled' => $next_backup !== false
         );
     }
@@ -175,7 +180,7 @@ class Wupz_Schedule {
             
             // If lock file is older than 30 minutes, consider it stale
             if (time() - $lock_time > 1800) {
-                unlink($lock_file);
+                wp_delete_file($lock_file);
                 return false;
             }
             
@@ -190,7 +195,15 @@ class Wupz_Schedule {
      */
     public function create_backup_lock() {
         $lock_file = WUPZ_BACKUP_DIR . '.backup_lock';
-        touch($lock_file);
+        
+        // Use WP_Filesystem for file operations
+        global $wp_filesystem;
+        if (!$wp_filesystem) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+        
+        $wp_filesystem->put_contents($lock_file, current_time('mysql'));
     }
     
     /**
@@ -199,7 +212,7 @@ class Wupz_Schedule {
     public function remove_backup_lock() {
         $lock_file = WUPZ_BACKUP_DIR . '.backup_lock';
         if (file_exists($lock_file)) {
-            unlink($lock_file);
+            wp_delete_file($lock_file);
         }
     }
 } 

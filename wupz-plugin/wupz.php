@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: Wupz
+ * Plugin Name: Wupz Backup
  * Plugin URI: https://wupz.org
- * Description: A comprehensive WordPress backup plugin that allows manual and scheduled backups of your database and files.
- * Version: 0.0.1
+ * Description: A comprehensive WordPress backup solution that allows manual and scheduled backups of your database and files.
+ * Version: 0.0.2
  * Author: Daniel Gietmann
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -145,7 +145,7 @@ class Wupz {
         check_ajax_referer('wupz_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions', 'wupz'));
+            wp_die(esc_html__('Insufficient permissions', 'wupz'));
         }
         
         $backup = new Wupz_Backup();
@@ -165,21 +165,36 @@ class Wupz {
         check_ajax_referer('wupz_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions', 'wupz'));
+            wp_die(esc_html__('Insufficient permissions', 'wupz'));
         }
         
-        $filename = sanitize_file_name($_GET['file']);
+        if (!isset($_GET['file'])) {
+            wp_die(esc_html__('No file specified', 'wupz'));
+        }
+        
+        $filename = sanitize_file_name(wp_unslash($_GET['file']));
         $filepath = WUPZ_BACKUP_DIR . $filename;
         
         if (file_exists($filepath)) {
-            header('Content-Type: application/zip');
-            header('Content-Disposition: attachment; filename="' . $filename . '"');
-            header('Content-Length: ' . filesize($filepath));
-            readfile($filepath);
-            exit;
+            // Use WP_Filesystem for file operations
+            global $wp_filesystem;
+            if (!$wp_filesystem) {
+                require_once ABSPATH . 'wp-admin/includes/file.php';
+                WP_Filesystem();
+            }
+            
+            $file_content = $wp_filesystem->get_contents($filepath);
+            if ($file_content !== false) {
+                header('Content-Type: application/zip');
+                header('Content-Disposition: attachment; filename="' . esc_attr($filename) . '"');
+                header('Content-Length: ' . strlen($file_content));
+                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Binary file content for download
+                echo $file_content;
+                exit;
+            }
         }
         
-        wp_die(__('File not found', 'wupz'));
+        wp_die(esc_html__('File not found', 'wupz'));
     }
     
     /**
@@ -189,10 +204,14 @@ class Wupz {
         check_ajax_referer('wupz_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions', 'wupz'));
+            wp_die(esc_html__('Insufficient permissions', 'wupz'));
         }
         
-        $filename = sanitize_file_name($_POST['file']);
+        if (!isset($_POST['file'])) {
+            wp_send_json_error(array('message' => __('No file specified', 'wupz')));
+        }
+        
+        $filename = sanitize_file_name(wp_unslash($_POST['file']));
         $backup = new Wupz_Backup();
         $result = $backup->delete_backup($filename);
         
@@ -237,10 +256,14 @@ class Wupz {
         check_ajax_referer('wupz_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions', 'wupz'));
+            wp_die(esc_html__('Insufficient permissions', 'wupz'));
         }
         
-        $schedule = sanitize_text_field($_POST['schedule']);
+        if (!isset($_POST['schedule'])) {
+            wp_send_json_error(array('message' => __('No schedule specified', 'wupz')));
+        }
+        
+        $schedule = sanitize_text_field(wp_unslash($_POST['schedule']));
         $allowed = array('disabled', 'daily', 'weekly');
         
         if (in_array($schedule, $allowed)) {
@@ -259,7 +282,7 @@ class Wupz {
         check_ajax_referer('wupz_nonce', 'nonce');
         
         if (!current_user_can('manage_options')) {
-            wp_die(__('Insufficient permissions', 'wupz'));
+            wp_die(esc_html__('Insufficient permissions', 'wupz'));
         }
         
         $schedule = new Wupz_Schedule();
