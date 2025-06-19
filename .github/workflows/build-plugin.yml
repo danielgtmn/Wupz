@@ -2,10 +2,7 @@ name: Build WordPress Plugin
 
 on:
   push:
-    branches: [ main, develop ]
     tags: [ 'v*' ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   build:
@@ -121,71 +118,6 @@ jobs:
         path: build/
         retention-days: 7
 
-  release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Get plugin version
-      id: version
-      run: |
-        VERSION=$(grep "Version:" wupz-plugin/wupz.php | head -1 | awk -F: '{print $2}' | xargs)
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        
-        # Extract tag version
-        TAG_VERSION=${GITHUB_REF#refs/tags/v}
-        echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
-        
-        echo "Plugin version: $VERSION"
-        echo "Tag version: $TAG_VERSION"
-    
-    - name: Download build artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: wupz-plugin-${{ steps.version.outputs.version }}
-    
-    - name: Generate changelog
-      id: changelog
-      run: |
-        if [ -f "CHANGELOG.md" ]; then
-          # Extract changelog for current version
-          awk '/^## \[?'"${{ steps.version.outputs.version }}"'\]?/{flag=1; next} /^## \[?[0-9]/{flag=0} flag' CHANGELOG.md > release_notes.md
-        else
-          echo "## What's Changed in v${{ steps.version.outputs.version }}" > release_notes.md
-          echo "" >> release_notes.md
-          echo "* Plugin package created automatically" >> release_notes.md
-          echo "* See commit history for detailed changes" >> release_notes.md
-        fi
-        
-        echo "Generated release notes:"
-        cat release_notes.md
-    
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: wupz-${{ steps.version.outputs.version }}.zip
-        body_path: release_notes.md
-        draft: false
-        prerelease: false
-        name: "Wupz WordPress Plugin v${{ steps.version.outputs.version }}"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: WordPress.org deployment preparation
-      run: |
-        echo "🚀 Release created successfully!"
-        echo "📦 Plugin package: wupz-${{ steps.version.outputs.version }}.zip"
-        echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
-        echo ""
-        echo "To deploy to WordPress.org:"
-        echo "1. Download the ZIP file from the release"
-        echo "2. Extract and review the contents"
-        echo "3. Follow WordPress.org plugin submission guidelines"
-        echo "4. Upload to WordPress.org SVN repository"
+
 
  
