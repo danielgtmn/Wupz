@@ -337,7 +337,7 @@ class Wupz_Settings {
                     <div class="wupz-info-box">
                         <h3><?php esc_html_e('Support', 'wupz'); ?></h3>
                         <p><?php esc_html_e('Need help with Wupz? Check out our documentation or contact support.', 'wupz'); ?></p>
-                        <a href="#" class="button button-secondary"><?php esc_html_e('Documentation', 'wupz'); ?></a>
+                        <a target="_blank" href="https://docs.wupz.org" class="button button-secondary"><?php esc_html_e('Documentation', 'wupz'); ?></a>
                     </div>
                 </div>
             </div>

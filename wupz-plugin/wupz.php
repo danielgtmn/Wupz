@@ -48,6 +48,7 @@ class Wupz {
         // Initialize components
         if (is_admin()) {
             new Wupz_Settings();
+            new Wupz_Updater(__FILE__);
         }
         
         new Wupz_Schedule();
@@ -73,6 +74,7 @@ class Wupz {
         require_once WUPZ_PLUGIN_PATH . 'includes/backup.php';
         require_once WUPZ_PLUGIN_PATH . 'includes/schedule.php';
         require_once WUPZ_PLUGIN_PATH . 'includes/settings.php';
+        require_once WUPZ_PLUGIN_PATH . 'includes/updater.php';
     }
     
     /**

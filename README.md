@@ -23,13 +23,14 @@ A comprehensive WordPress backup solution that allows you to create, schedule, a
 
 ## 📖 Documentation
 
-For detailed installation, configuration, and usage instructions, please visit our **[Wiki](https://github.com/danielgtmn/Wupz/wiki)**:
+For detailed installation, configuration, and usage instructions, please visit our **[official documentation site](https://docs.wups.org)**.
 
-- **[Installation Guide](https://github.com/danielgtmn/wupz/wiki/Installation)** - Step-by-step installation
-- **[Configuration](https://github.com/danielgtmn/wupz/wiki/Configuration)** - Setup and settings
-- **[Usage Guide](https://github.com/danielgtmn/wupz/wiki/Usage)** - How to use Wupz
-- **[Scheduled Backups](https://github.com/danielgtmn/wupz/wiki/Scheduled-Backups)** - Automated backups
-- **[Troubleshooting](https://github.com/danielgtmn/wupz/wiki/Troubleshooting)** - Common issues and solutions
+- **[Installation Guide](https://docs.wups.org/plugins/wupz-backup/installation)** - Step-by-step installation
+- **[Configuration](https://docs.wups.org/plugins/wupz-backup/configuration)** - Setup and settings
+- **[Usage Guide](https://docs.wups.org/plugins/wupz-backup/usage)** - How to use Wupz
+- **[Scheduled Backups](https://docs.wups.org/plugins/wupz-backup/scheduled-backups)** - Automated backups
+- **[Troubleshooting](https://docs.wups.org/plugins/wupz-backup/troubleshooting)** - Common issues and solutions
+- **[Auto-Updates](https://docs.wups.org/plugins/wupz-backup/auto-updates)** - How the plugin stays up-to-date
 
 ## 📋 Requirements
 
@@ -49,9 +50,9 @@ For detailed installation, configuration, and usage instructions, please visit o
 
 ## 🆘 Support
 
-- **Documentation**: Check our [Wiki](https://github.com/danielgtmn/wupz/wiki) first
+- **Documentation**: Check our [official documentation](https://docs.wups.org) first
 - **Issues**: [GitHub Issues](https://github.com/danielgtmn/wupz/issues)
-- **Troubleshooting**: [Troubleshooting Guide](https://github.com/danielgtmn/wupz/wiki/Troubleshooting)
+- **Troubleshooting**: [Troubleshooting Guide](https://docs.wups.org/plugins/wupz-backup/troubleshooting)
 
 ## 📄 License
 

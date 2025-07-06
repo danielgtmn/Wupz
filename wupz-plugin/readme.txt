@@ -102,7 +102,7 @@ This version includes important security improvements and system status monitori
 
 == Support ==
 
-For support and documentation, please visit our wiki or contact us through the plugin support channels.
+For support and detailed documentation, please visit our official documentation site: https://docs.wups.org
 
 == Privacy ==
 
