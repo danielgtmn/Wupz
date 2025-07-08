@@ -15,10 +15,15 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Include the Composer autoloader
+if (file_exists(plugin_dir_path(__FILE__) . 'vendor/autoload.php')) {
+    require_once plugin_dir_path(__FILE__) . 'vendor/autoload.php';
+}
+
 // Define plugin constants
 define('WUPZ_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WUPZ_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('WUPZ_PLUGIN_VERSION', '1.0.0');
+define('WUPZ_PLUGIN_VERSION', '0.0.3');
 define('WUPZ_BACKUP_DIR', WP_CONTENT_DIR . '/wupz-backups/');
 
 /**
@@ -75,6 +80,7 @@ class Wupz {
         require_once WUPZ_PLUGIN_PATH . 'includes/schedule.php';
         require_once WUPZ_PLUGIN_PATH . 'includes/settings.php';
         require_once WUPZ_PLUGIN_PATH . 'includes/updater.php';
+        require_once WUPZ_PLUGIN_PATH . 'includes/s3.php';
     }
     
     /**
@@ -98,6 +104,15 @@ class Wupz {
             'manage_options',
             'wupz-settings',
             array($this, 'settings_page')
+        );
+
+        add_submenu_page(
+            'wupz',
+            __('Storage', 'wupz'),
+            __('Storage', 'wupz'),
+            'manage_options',
+            'wupz-storage',
+            array($this, 'storage_settings_page')
         );
     }
     
@@ -141,6 +156,14 @@ class Wupz {
     }
     
     /**
+     * Storage settings page
+     */
+    public function storage_settings_page() {
+        $settings = new Wupz_Settings();
+        $settings->display_storage_settings_page();
+    }
+
+    /**
      * Handle manual backup AJAX request
      */
     public function handle_manual_backup() {
@@ -170,11 +193,25 @@ class Wupz {
             wp_die(esc_html__('Insufficient permissions', 'wupz'));
         }
         
-        if (!isset($_GET['file'])) {
-            wp_die(esc_html__('No file specified', 'wupz'));
+        if (!isset($_GET['file']) || !isset($_GET['location'])) {
+            wp_die(esc_html__('No file or location specified', 'wupz'));
         }
         
         $filename = sanitize_file_name(wp_unslash($_GET['file']));
+        $location = sanitize_text_field(wp_unslash($_GET['location']));
+
+        if ($location === 's3') {
+            $s3 = new Wupz_S3();
+            if ($s3->is_configured()) {
+                $download_url = $s3->get_download_url($filename);
+                if ($download_url) {
+                    wp_redirect($download_url);
+                    exit;
+                }
+            }
+            wp_die(esc_html__('Could not generate S3 download link.', 'wupz'));
+        }
+
         $filepath = WUPZ_BACKUP_DIR . $filename;
         
         if (file_exists($filepath)) {

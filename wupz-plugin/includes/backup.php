@@ -65,6 +65,16 @@ class Wupz_Backup {
             // Clean up old backups
             $this->cleanup_old_backups();
             
+            // Upload to S3 if configured
+            $s3 = new Wupz_S3();
+            if ($s3->is_configured()) {
+                $s3_upload_success = $s3->upload_file($backup_path, $backup_filename);
+
+                if ($s3_upload_success && !empty($settings['s3_delete_local'])) {
+                    wp_delete_file($backup_path);
+                }
+            }
+
             // Update last backup info
             update_option('wupz_last_backup', array(
                 'timestamp' => time(),
@@ -246,6 +256,25 @@ class Wupz_Backup {
         
         $backups = $this->get_backup_list();
         
+        // Handle S3 backups
+        $s3 = new Wupz_S3();
+        if ($s3->is_configured()) {
+            $s3_files = $s3->list_files();
+            if (count($s3_files) > $max_backups) {
+                // Sort by date (oldest first)
+                usort($s3_files, function($a, $b) {
+                    return $a['LastModified'] <=> $b['LastModified'];
+                });
+
+                $files_to_delete = array_slice($s3_files, 0, count($s3_files) - $max_backups);
+
+                foreach ($files_to_delete as $file) {
+                    $s3->delete_file($file['Key']);
+                }
+            }
+        }
+
+        // Handle local backups
         if (count($backups) > $max_backups) {
             // Sort by date (oldest first)
             usort($backups, function($a, $b) {
@@ -262,28 +291,42 @@ class Wupz_Backup {
     }
     
     /**
-     * Get list of backup files
-     * 
-     * @return array List of backup files with metadata
+     * Get list of available backups
      */
     public function get_backup_list() {
         $backups = array();
-        
-        if (!is_dir(WUPZ_BACKUP_DIR)) {
-            return $backups;
+
+        // Get local backups
+        if (is_dir(WUPZ_BACKUP_DIR)) {
+            $files = scandir(WUPZ_BACKUP_DIR);
+            
+            foreach ($files as $file) {
+                if (pathinfo($file, PATHINFO_EXTENSION) == 'zip') {
+                    $filepath = WUPZ_BACKUP_DIR . $file;
+                    $backups[] = array(
+                        'filename' => $file,
+                        'size' => $this->format_bytes(filesize($filepath)),
+                        'date' => filemtime($filepath),
+                        'location' => 'local'
+                    );
+                }
+            }
         }
-        
-        $files = scandir(WUPZ_BACKUP_DIR);
-        
-        foreach ($files as $file) {
-            if (preg_match('/^wupz-backup-(.+)\.zip$/', $file, $matches)) {
-                $file_path = WUPZ_BACKUP_DIR . $file;
-                $backups[] = array(
-                    'filename' => $file,
-                    'size' => $this->format_bytes(filesize($file_path)),
-                    'date' => filemtime($file_path),
-                    'date_formatted' => get_date_from_gmt(gmdate('Y-m-d H:i:s', filemtime($file_path)), 'Y-m-d H:i:s')
-                );
+
+        // Get S3 backups
+        $s3 = new Wupz_S3();
+        if ($s3->is_configured()) {
+            $s3_files = $s3->list_files();
+            foreach ($s3_files as $file) {
+                // Avoid duplicates if local file also exists
+                if (!in_array($file['Key'], array_column($backups, 'filename'))) {
+                    $backups[] = array(
+                        'filename' => $file['Key'],
+                        'size' => $this->format_bytes($file['Size']),
+                        'date' => $file['LastModified']->getTimestamp(),
+                        'location' => 's3'
+                    );
+                }
             }
         }
         
@@ -302,13 +345,25 @@ class Wupz_Backup {
      * @return bool Success status
      */
     public function delete_backup($filename) {
-        $file_path = WUPZ_BACKUP_DIR . sanitize_file_name($filename);
-        
-        if (file_exists($file_path) && preg_match('/^wupz-backup-(.+)\.zip$/', $filename)) {
-            return wp_delete_file($file_path);
+        $filepath = WUPZ_BACKUP_DIR . $filename;
+        $deleted = false;
+
+        // Delete local file
+        if (file_exists($filepath)) {
+            if (wp_delete_file($filepath)) {
+                $deleted = true;
+            }
         }
         
-        return false;
+        // Delete from S3
+        $s3 = new Wupz_S3();
+        if ($s3->is_configured()) {
+            if ($s3->delete_file($filename)) {
+                $deleted = true;
+            }
+        }
+
+        return $deleted;
     }
     
     /**

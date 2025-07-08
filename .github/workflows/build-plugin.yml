@@ -16,6 +16,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '7.4'
+    
+    - name: Install Composer dependencies
+      working-directory: ./wupz-plugin
+      run: composer install --no-dev --optimize-autoloader
+    
     - name: Get plugin version
       id: version
       run: |
@@ -62,6 +71,10 @@ jobs:
         echo "Removing development files..."
         
         # Remove any development/build files that shouldn't be in the package
+        rm -f build/wupz/composer.json
+        rm -f build/wupz/composer.lock
+        rm -f build/wupz/composer.phar
+        rm -f build/wupz/.gitignore
         find build/wupz -name ".git*" -delete 2>/dev/null || true
         find build/wupz -name "*.log" -delete 2>/dev/null || true
         find build/wupz -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -163,7 +176,7 @@ jobs:
           - Easy-to-use admin interface
           
           ### Documentation
-          Visit our [Wiki](https://github.com/danielgtmn/Wupz/wiki) for detailed documentation.
+          Visit our [Wiki](https://docs.wupz.org/plugins/wupz-backup) for detailed documentation.
           
           ---
           **Full Changelog**: https://github.com/danielgtmn/Wupz/commits/${{ github.ref_name }}

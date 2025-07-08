@@ -13,7 +13,7 @@ class Wupz_Settings {
     /**
      * Default settings
      */
-    private $defaults = [
+    private static $defaults = [
         'max_backups' => 5,
         'backup_database' => true,
         'backup_files' => true,
@@ -32,12 +32,44 @@ class Wupz_Settings {
             'wupz-backups/'
         ]
     ];
+
+    private static $storage_defaults = [
+        's3_enabled' => false,
+        's3_access_key' => '',
+        's3_secret_key' => '',
+        's3_bucket' => '',
+        's3_region' => '',
+        's3_endpoint' => '',
+        's3_delete_local' => false
+    ];
     
     /**
      * Constructor
      */
     public function __construct() {
         add_action('admin_init', array($this, 'init_settings'));
+        add_action('admin_init', array($this, 'init_storage_settings'));
+        add_action('admin_init', array($this, 'handle_force_update_check'));
+    }
+
+    /**
+     * Handle force update check
+     */
+    public function handle_force_update_check() {
+        if (
+            isset($_GET['action']) && 
+            $_GET['action'] === 'wupz_check_for_updates' && 
+            isset($_GET['_wpnonce']) && 
+            wp_verify_nonce(sanitize_key($_GET['_wpnonce']), 'wupz_check_for_updates')
+        ) {
+            Wupz_Updater::clear_update_transient();
+            
+            $redirect_url = remove_query_arg(['action', '_wpnonce'], wp_get_referer());
+            $redirect_url = add_query_arg('update-checked', 'true', $redirect_url);
+            
+            wp_safe_redirect($redirect_url);
+            exit;
+        }
     }
     
     /**
@@ -72,6 +104,25 @@ class Wupz_Settings {
         // Add settings fields
         $this->add_settings_fields();
     }
+
+    /**
+     * Initialize storage settings
+     */
+    public function init_storage_settings() {
+        // Register settings
+        register_setting('wupz_storage_settings_group', 'wupz_storage_settings', array($this, 'sanitize_storage_settings'));
+
+        // Add settings sections
+        add_settings_section(
+            'wupz_s3_section',
+            __('S3 Storage Settings', 'wupz'),
+            array($this, 's3_section_callback'),
+            'wupz_storage_settings'
+        );
+
+        // Add settings fields
+        $this->add_storage_settings_fields();
+    }
     
     /**
      * Add settings fields
@@ -104,9 +155,9 @@ class Wupz_Settings {
         
         // Schedule settings
         add_settings_field(
-            'schedule_interval',
+            'backup_schedule',
             __('Backup Schedule', 'wupz'),
-            array($this, 'schedule_interval_callback'),
+            array($this, 'backup_schedule_callback'),
             'wupz_settings',
             'wupz_schedule_section'
         );
@@ -121,11 +172,73 @@ class Wupz_Settings {
         
         // Advanced settings
         add_settings_field(
-            'exclude_files',
+            'exclude_patterns',
             __('Exclude File Patterns', 'wupz'),
-            array($this, 'exclude_files_callback'),
+            array($this, 'exclude_patterns_callback'),
             'wupz_settings',
             'wupz_advanced_section'
+        );
+    }
+
+    /**
+     * Add storage settings fields
+     */
+    private function add_storage_settings_fields() {
+        // S3 settings
+        add_settings_field(
+            's3_enabled',
+            __('Enable S3 Backup', 'wupz'),
+            array($this, 's3_enabled_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
+        );
+
+        add_settings_field(
+            's3_access_key',
+            __('S3 Access Key ID', 'wupz'),
+            array($this, 's3_access_key_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
+        );
+
+        add_settings_field(
+            's3_secret_key',
+            __('S3 Secret Access Key', 'wupz'),
+            array($this, 's3_secret_key_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
+        );
+
+        add_settings_field(
+            's3_bucket',
+            __('S3 Bucket Name', 'wupz'),
+            array($this, 's3_bucket_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
+        );
+
+        add_settings_field(
+            's3_region',
+            __('S3 Region', 'wupz'),
+            array($this, 's3_region_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
+        );
+
+        add_settings_field(
+            's3_endpoint',
+            __('S3 Endpoint', 'wupz'),
+            array($this, 's3_endpoint_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
+        );
+
+        add_settings_field(
+            's3_delete_local',
+            __('Delete Local Backup', 'wupz'),
+            array($this, 's3_delete_local_callback'),
+            'wupz_storage_settings',
+            'wupz_s3_section'
         );
     }
     
@@ -151,11 +264,18 @@ class Wupz_Settings {
     }
     
     /**
+     * S3 section callback
+     */
+    public function s3_section_callback() {
+        echo '<p>' . esc_html__('Configure settings for backing up to an S3 bucket.', 'wupz') . '</p>';
+    }
+
+    /**
      * Max backups field callback
      */
     public function max_backups_callback() {
-        $settings = get_option('wupz_settings', array());
-        $value = isset($settings['max_backups']) ? $settings['max_backups'] : 5;
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $value = $settings['max_backups'];
         
         echo '<input type="number" name="wupz_settings[max_backups]" value="' . esc_attr($value) . '" min="0" max="50" />';
         echo '<p class="description">' . esc_html__('Number of backup files to keep. Set to 0 to keep all backups.', 'wupz') . '</p>';
@@ -165,8 +285,8 @@ class Wupz_Settings {
      * Backup database field callback
      */
     public function backup_database_callback() {
-        $settings = get_option('wupz_settings', array());
-        $value = isset($settings['backup_database']) ? $settings['backup_database'] : 1;
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $value = $settings['backup_database'];
         
         echo '<label>';
         echo '<input type="checkbox" name="wupz_settings[backup_database]" value="1" ' . checked(1, $value, false) . ' />';
@@ -178,8 +298,8 @@ class Wupz_Settings {
      * Backup files field callback
      */
     public function backup_files_callback() {
-        $settings = get_option('wupz_settings', array());
-        $value = isset($settings['backup_files']) ? $settings['backup_files'] : 1;
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $value = $settings['backup_files'];
         
         echo '<label>';
         echo '<input type="checkbox" name="wupz_settings[backup_files]" value="1" ' . checked(1, $value, false) . ' />';
@@ -191,9 +311,9 @@ class Wupz_Settings {
     /**
      * Schedule interval field callback
      */
-    public function schedule_interval_callback() {
-        $settings = get_option('wupz_settings', array());
-        $value = isset($settings['schedule_interval']) ? $settings['schedule_interval'] : 'weekly';
+    public function backup_schedule_callback() {
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $value = $settings['backup_schedule'];
         
         $intervals = array(
             'disabled' => __('Disabled', 'wupz'),
@@ -201,7 +321,7 @@ class Wupz_Settings {
             'weekly' => __('Weekly', 'wupz')
         );
         
-        echo '<select name="wupz_settings[schedule_interval]">';
+        echo '<select name="wupz_settings[backup_schedule]">';
         foreach ($intervals as $key => $label) {
             echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>';
         }
@@ -213,8 +333,8 @@ class Wupz_Settings {
      * Email notifications field callback
      */
     public function email_notifications_callback() {
-        $settings = get_option('wupz_settings', array());
-        $value = isset($settings['email_notifications']) ? $settings['email_notifications'] : 0;
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $value = $settings['email_notifications'];
         
         echo '<label>';
         echo '<input type="checkbox" name="wupz_settings[email_notifications]" value="1" ' . checked(1, $value, false) . ' />';
@@ -224,14 +344,92 @@ class Wupz_Settings {
     }
     
     /**
+     * S3 enabled field callback
+     */
+    public function s3_enabled_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_enabled'];
+        
+        echo '<label>';
+        echo '<input type="checkbox" name="wupz_storage_settings[s3_enabled]" value="1" ' . checked(1, $value, false) . ' />';
+        echo ' ' . esc_html__('Enable uploading backups to S3', 'wupz');
+        echo '</label>';
+    }
+
+    /**
+     * S3 access key field callback
+     */
+    public function s3_access_key_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_access_key'];
+        
+        echo '<input type="text" name="wupz_storage_settings[s3_access_key]" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    /**
+     * S3 secret key field callback
+     */
+    public function s3_secret_key_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_secret_key'];
+        
+        echo '<input type="password" name="wupz_storage_settings[s3_secret_key]" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    /**
+     * S3 bucket field callback
+     */
+    public function s3_bucket_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_bucket'];
+        
+        echo '<input type="text" name="wupz_storage_settings[s3_bucket]" value="' . esc_attr($value) . '" class="regular-text" />';
+    }
+
+    /**
+     * S3 region field callback
+     */
+    public function s3_region_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_region'];
+        
+        echo '<input type="text" name="wupz_storage_settings[s3_region]" value="' . esc_attr($value) . '" class="regular-text" />';
+        echo '<p class="description">' . esc_html__('e.g. us-east-1', 'wupz') . '</p>';
+    }
+
+    /**
+     * S3 endpoint field callback
+     */
+    public function s3_endpoint_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_endpoint'];
+        
+        echo '<input type="url" name="wupz_storage_settings[s3_endpoint]" value="' . esc_attr($value) . '" class="regular-text" placeholder="https://s3.example.com" />';
+        echo '<p class="description">' . esc_html__('Optional. Provide the endpoint for S3-compatible services. Leave blank for AWS S3.', 'wupz') . '</p>';
+    }
+
+    /**
+     * S3 delete local field callback
+     */
+    public function s3_delete_local_callback() {
+        $settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        $value = $settings['s3_delete_local'];
+        
+        echo '<label>';
+        echo '<input type="checkbox" name="wupz_storage_settings[s3_delete_local]" value="1" ' . checked(1, $value, false) . ' />';
+        echo ' ' . esc_html__('Delete local backup file after successful S3 upload', 'wupz');
+        echo '</label>';
+    }
+
+    /**
      * Exclude files field callback
      */
-    public function exclude_files_callback() {
-        $settings = get_option('wupz_settings', array());
-        $value = isset($settings['exclude_files']) ? $settings['exclude_files'] : "*.log\n*.tmp\ncache/*\ntmp/*";
+    public function exclude_patterns_callback() {
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $value = implode("\n", $settings['exclude_patterns']);
         
-        echo '<textarea name="wupz_settings[exclude_files]" rows="5" cols="50" class="regular-text">' . esc_textarea($value) . '</textarea>';
-        echo '<p class="description">' . esc_html__('File patterns to exclude from backups, one per line. Use * as wildcard.', 'wupz') . '</p>';
+        echo '<textarea name="wupz_settings[exclude_patterns]" rows="5" cols="50" class="large-text code">' . esc_textarea($value) . '</textarea>';
+        echo '<p class="description">' . esc_html__('One pattern per line. Use wildcards (*) to match characters.', 'wupz') . '</p>';
     }
     
     /**
@@ -241,42 +439,61 @@ class Wupz_Settings {
      * @return array Sanitized settings
      */
     public function sanitize_settings($input) {
-        $sanitized = array();
+        $sanitized_input = array();
         
         // Sanitize max_backups
         if (isset($input['max_backups'])) {
-            $sanitized['max_backups'] = absint($input['max_backups']);
+            $sanitized_input['max_backups'] = absint($input['max_backups']);
         }
         
         // Sanitize checkboxes
         $checkboxes = array('backup_database', 'backup_files', 'email_notifications');
         foreach ($checkboxes as $checkbox) {
-            $sanitized[$checkbox] = isset($input[$checkbox]) ? 1 : 0;
+            $sanitized_input[$checkbox] = isset($input[$checkbox]) ? 1 : 0;
         }
         
         // Sanitize schedule interval
-        if (isset($input['schedule_interval'])) {
+        if (isset($input['backup_schedule'])) {
             $allowed_intervals = array('disabled', 'daily', 'weekly');
-            $sanitized['schedule_interval'] = in_array($input['schedule_interval'], $allowed_intervals) 
-                ? $input['schedule_interval'] 
+            $sanitized_input['backup_schedule'] = in_array($input['backup_schedule'], $allowed_intervals) 
+                ? $input['backup_schedule'] 
                 : 'weekly';
                 
             // Update schedule if changed
             $current_settings = get_option('wupz_settings', array());
-            $current_interval = isset($current_settings['schedule_interval']) ? $current_settings['schedule_interval'] : 'weekly';
+            $current_interval = isset($current_settings['backup_schedule']) ? $current_settings['backup_schedule'] : 'weekly';
             
-            if ($sanitized['schedule_interval'] !== $current_interval) {
+            if ($sanitized_input['backup_schedule'] !== $current_interval) {
                 $schedule = new Wupz_Schedule();
-                $schedule->update_schedule($sanitized['schedule_interval']);
+                $schedule->update_schedule($sanitized_input['backup_schedule']);
             }
         }
         
-        // Sanitize exclude files
-        if (isset($input['exclude_files'])) {
-            $sanitized['exclude_files'] = sanitize_textarea_field($input['exclude_files']);
+        // Sanitize exclude patterns
+        if (isset($input['exclude_patterns'])) {
+            $patterns = explode("\n", $input['exclude_patterns']);
+            $sanitized_input['exclude_patterns'] = array_map('sanitize_text_field', $patterns);
         }
         
-        return $sanitized;
+        return $sanitized_input;
+    }
+
+    /**
+     * Sanitize storage settings
+     */
+    public function sanitize_storage_settings($input) {
+        $sanitized_input = array();
+
+        // Sanitize S3 settings
+        $sanitized_input['s3_enabled'] = isset($input['s3_enabled']) ? 1 : 0;
+        $sanitized_input['s3_access_key'] = sanitize_text_field($input['s3_access_key']);
+        $sanitized_input['s3_secret_key'] = sanitize_text_field($input['s3_secret_key']);
+        $sanitized_input['s3_bucket'] = sanitize_text_field($input['s3_bucket']);
+        $sanitized_input['s3_region'] = sanitize_text_field($input['s3_region']);
+        $sanitized_input['s3_endpoint'] = isset($input['s3_endpoint']) ? esc_url_raw($input['s3_endpoint']) : '';
+        $sanitized_input['s3_delete_local'] = isset($input['s3_delete_local']) ? 1 : 0;
+
+        return $sanitized_input;
     }
     
     /**
@@ -302,6 +519,12 @@ class Wupz_Settings {
             <?php if (isset($_GET['settings-updated']) && sanitize_text_field(wp_unslash($_GET['settings-updated']))): ?>
                 <div class="notice notice-success is-dismissible">
                     <p><?php esc_html_e('Settings saved successfully.', 'wupz'); ?></p>
+                </div>
+            <?php endif; ?>
+
+            <?php if (isset($_GET['update-checked']) && sanitize_text_field(wp_unslash($_GET['update-checked']))): ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><?php esc_html_e('Forced update check. If a new version is available, it will appear on the Plugins page.', 'wupz'); ?></p>
                 </div>
             <?php endif; ?>
             
@@ -339,8 +562,36 @@ class Wupz_Settings {
                         <p><?php esc_html_e('Need help with Wupz? Check out our documentation or contact support.', 'wupz'); ?></p>
                         <a target="_blank" href="https://docs.wupz.org" class="button button-secondary"><?php esc_html_e('Documentation', 'wupz'); ?></a>
                     </div>
+
+                    <div class="wupz-info-box">
+                        <h3><?php esc_html_e('Plugin Updates', 'wupz'); ?></h3>
+                        <p><?php esc_html_e('Force WordPress to check for a new version of the plugin.', 'wupz'); ?></p>
+                        <?php
+                            $check_url = wp_nonce_url(add_query_arg('action', 'wupz_check_for_updates'), 'wupz_check_for_updates');
+                        ?>
+                        <a href="<?php echo esc_url($check_url); ?>" class="button button-secondary"><?php esc_html_e('Check for Updates', 'wupz'); ?></a>
+                    </div>
                 </div>
             </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Display storage settings page
+     */
+    public function display_storage_settings_page() {
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('Wupz Storage Settings', 'wupz'); ?></h1>
+            
+            <form method="post" action="options.php">
+                <?php
+                settings_fields('wupz_storage_settings_group');
+                do_settings_sections('wupz_storage_settings');
+                submit_button();
+                ?>
+            </form>
         </div>
         <?php
     }
@@ -354,19 +605,13 @@ class Wupz_Settings {
     }
     
     /**
-     * Get plugin settings
-     * 
-     * @return array Plugin settings
+     * Get all settings
      */
     public static function get_settings() {
-        return get_option('wupz_settings', array(
-            'schedule_interval' => 'weekly',
-            'max_backups' => 5,
-            'backup_database' => 1,
-            'backup_files' => 1,
-            'email_notifications' => 0,
-            'exclude_files' => "*.log\n*.tmp\ncache/*\ntmp/*"
-        ));
+        $general_settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $storage_settings = wp_parse_args(get_option('wupz_storage_settings', array()), self::$storage_defaults);
+        
+        return array_merge($general_settings, $storage_settings);
     }
     
     /**

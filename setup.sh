@@ -45,6 +45,10 @@ docker-compose up -d --build
 echo "⏳ Waiting for WordPress to initialize (30 seconds)..."
 sleep 30
 
+# Install Composer dependencies inside the container
+echo "🎵 Installing Composer dependencies..."
+docker-compose run --rm wp-cli composer install --no-dev --working-dir=/var/www/html/wp-content/plugins/wupz
+
 # Setup WordPress
 echo "🔧 Installing WordPress..."
 docker-compose run --rm wp-cli wp core install \

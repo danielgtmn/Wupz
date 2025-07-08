@@ -66,4 +66,8 @@ class Wupz_Updater {
         
         return $release_info;
     }
+
+    public static function clear_update_transient() {
+        delete_transient('wupz_github_release_info');
+    }
 } 

@@ -141,50 +141,22 @@ $system_status = $settings->get_system_status();
             <div class="wupz-card">
                 <h2><?php esc_html_e('Available Backups', 'wupz'); ?></h2>
                 
-                <?php if (!empty($backups)): ?>
-                    <div class="wupz-backups-table-wrap">
-                        <table class="wp-list-table widefat fixed striped">
-                            <thead>
-                                <tr>
-                                    <th scope="col"><?php esc_html_e('Backup File', 'wupz'); ?></th>
-                                    <th scope="col"><?php esc_html_e('Date Created', 'wupz'); ?></th>
-                                    <th scope="col"><?php esc_html_e('Size', 'wupz'); ?></th>
-                                    <th scope="col"><?php esc_html_e('Actions', 'wupz'); ?></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($backups as $backup): ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?php echo esc_html($backup['filename']); ?></strong>
-                                        </td>
-                                        <td>
-                                            <?php echo esc_html($backup['date_formatted']); ?>
-                                        </td>
-                                        <td>
-                                            <?php echo esc_html($backup['size']); ?>
-                                        </td>
-                                        <td>
-                                            <div class="wupz-backup-actions">
-                                                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-ajax.php?action=wupz_download_backup&file=' . urlencode($backup['filename'])), 'wupz_nonce', 'nonce')); ?>" 
-                                                   class="button button-small">
-                                                    <span class="dashicons dashicons-download"></span>
-                                                    <?php esc_html_e('Download', 'wupz'); ?>
-                                                </a>
-                                                
-                                                <button class="button button-small wupz-delete-backup" 
-                                                        data-filename="<?php echo esc_attr($backup['filename']); ?>">
-                                                    <span class="dashicons dashicons-trash"></span>
-                                                    <?php esc_html_e('Delete', 'wupz'); ?>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
+                <?php if (!empty($backups)) : ?>
+                    <ul class="wupz-backup-list">
+                        <?php foreach ($backups as $item) : ?>
+                            <li>
+                                <span class="backup-name"><?php echo esc_html($item['filename']); ?></span>
+                                <span class="backup-date"><?php echo esc_html(get_date_from_gmt(gmdate('Y-m-d H:i:s', $item['date']), 'Y-m-d H:i:s')); ?></span>
+                                <span class="backup-size"><?php echo esc_html($item['size']); ?></span>
+                                <span class="backup-location"><?php echo esc_html(strtoupper($item['location'])); ?></span>
+                                <div class="backup-actions">
+                                    <a href="<?php echo esc_url(admin_url('admin-ajax.php?action=wupz_download_backup&file=' . urlencode($item['filename']) . '&location=' . urlencode($item['location']) . '&nonce=' . wp_create_nonce('wupz_nonce'))); ?>" class="button button-secondary"><?php esc_html_e('Download', 'wupz'); ?></a>
+                                    <button class="button button-danger wupz-delete-backup" data-file="<?php echo esc_attr($item['filename']); ?>"><?php esc_html_e('Delete', 'wupz'); ?></button>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else : ?>
                     <div class="wupz-empty-state">
                         <span class="dashicons dashicons-backup"></span>
                         <h3><?php esc_html_e('No backups found', 'wupz'); ?></h3>
