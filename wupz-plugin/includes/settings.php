@@ -743,7 +743,7 @@ class Wupz_Settings {
         ];
         
         // Check PHP version
-        $min_php_version = '7.4';
+        $min_php_version = '8.1';
         $php_check = version_compare(PHP_VERSION, $min_php_version, '>=');
         $status['checks']['php'] = [
             'label' => 'PHP Version',

@@ -4,6 +4,7 @@
  * Plugin URI: https://wupz.org
  * Description: A comprehensive WordPress backup solution that allows manual and scheduled backups of your database and files.
  * Version: 0.0.4
+ * Requires PHP: 8.1
  * Author: Daniel Gietmann
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html

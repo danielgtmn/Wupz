@@ -3,6 +3,14 @@ name: Build WordPress Plugin
 on:
   push:
     tags: [ 'v*' ]
+  # Rebuild an already published tag (for example v0.0.4) without moving the tag
+  # or editing the release notes. Select this workflow on main and pass the tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to build, for example v0.0.4'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,65 +19,168 @@ jobs:
   build:
     name: Build Plugin Package
     runs-on: ubuntu-latest
-    
+
     steps:
+    - name: Validate dispatch tag
+      if: github.event_name == 'workflow_dispatch'
+      env:
+        TAG: ${{ github.event.inputs.tag }}
+      run: |
+        set -euo pipefail
+        if ! printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.+-][0-9A-Za-z.+-]+)?$'; then
+          echo "::error::Tag must look like v0.0.4 (got: ${TAG})"
+          exit 1
+        fi
+
     - name: Checkout code
       uses: actions/checkout@v4
-    
+      with:
+        # Tag pushes build the tag that triggered the workflow. A manual run
+        # checks out the tag input so an existing release can be rebuilt from
+        # that commit. The workflow file itself stays the one from main.
+        ref: ${{ github.event.inputs.tag || github.ref }}
+
     - name: Setup PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '7.4'
-    
+        php-version: '8.1'
+        coverage: none
+
     - name: Install Composer dependencies
       working-directory: ./wupz-plugin
       run: composer install --no-dev --optimize-autoloader
-    
+
     - name: Get plugin version
       id: version
       run: |
         VERSION=$(grep "Version:" wupz-plugin/wupz.php | head -1 | awk -F: '{print $2}' | xargs)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Plugin version: $VERSION"
-    
+
     - name: Create build directory
       run: |
         mkdir -p build/wupz
         echo "Build directory created"
-    
+
     - name: Copy plugin files
       run: |
         echo "Copying plugin files..."
-        
-        # Copy main plugin files
+
+        # Copy main plugin files. vendor/ is included; dotfiles are not.
         cp -r wupz-plugin/* build/wupz/
-        
-                 # Create readme.txt for WordPress.org (if not exists)
-         if [ ! -f "build/wupz/readme.txt" ]; then
-           echo "Creating WordPress.org readme.txt file..."
-           echo "=== Wupz - WordPress Backup Plugin ===" > build/wupz/readme.txt
-           echo "Contributors: wupzbackup" >> build/wupz/readme.txt
-           echo "Tags: backup, database, files, scheduled, zip" >> build/wupz/readme.txt
-           echo "Requires at least: 5.0" >> build/wupz/readme.txt
-           echo "Tested up to: 6.3" >> build/wupz/readme.txt
-           echo "Requires PHP: 7.4" >> build/wupz/readme.txt
-           echo "Stable tag: 1.0.0" >> build/wupz/readme.txt
-           echo "License: GPLv2 or later" >> build/wupz/readme.txt
-           echo "License URI: https://www.gnu.org/licenses/gpl-2.0.html" >> build/wupz/readme.txt
-           echo "" >> build/wupz/readme.txt
-           echo "A comprehensive WordPress backup plugin that allows manual and scheduled backups." >> build/wupz/readme.txt
-           echo "" >> build/wupz/readme.txt
-           echo "== Description ==" >> build/wupz/readme.txt
-           echo "" >> build/wupz/readme.txt
-           echo "Wupz is a powerful and easy-to-use WordPress backup plugin." >> build/wupz/readme.txt
-         fi
-        
+
+        # Create readme.txt for WordPress.org (if not exists)
+        if [ ! -f "build/wupz/readme.txt" ]; then
+          echo "Creating WordPress.org readme.txt file..."
+          echo "=== Wupz - WordPress Backup Plugin ===" > build/wupz/readme.txt
+          echo "Contributors: wupzbackup" >> build/wupz/readme.txt
+          echo "Tags: backup, database, files, scheduled, zip" >> build/wupz/readme.txt
+          echo "Requires at least: 5.0" >> build/wupz/readme.txt
+          echo "Tested up to: 6.3" >> build/wupz/readme.txt
+          echo "Requires PHP: 8.1" >> build/wupz/readme.txt
+          echo "Stable tag: 1.0.0" >> build/wupz/readme.txt
+          echo "License: GPLv2 or later" >> build/wupz/readme.txt
+          echo "License URI: https://www.gnu.org/licenses/gpl-2.0.html" >> build/wupz/readme.txt
+          echo "" >> build/wupz/readme.txt
+          echo "A comprehensive WordPress backup plugin that allows manual and scheduled backups." >> build/wupz/readme.txt
+          echo "" >> build/wupz/readme.txt
+          echo "== Description ==" >> build/wupz/readme.txt
+          echo "" >> build/wupz/readme.txt
+          echo "Wupz is a powerful and easy-to-use WordPress backup plugin." >> build/wupz/readme.txt
+        fi
+
         echo "✅ Plugin files copied successfully"
-    
+
+    - name: Require PHP 8.1 in the package
+      run: |
+        # v0.0.4 still declares PHP 7.4. WordPress blocks an upload from the
+        # Requires PHP header inside the zip, so raise that declaration in the
+        # package only. The git tag and the release notes are not modified.
+        # A source that already requires 8.1 or newer is left as-is.
+        php <<'PHP'
+        <?php
+        $root = 'build/wupz';
+        $minimum = '8.1';
+
+        $header_path = $root . '/wupz.php';
+        $header = file_get_contents($header_path);
+        if (!is_string($header)) {
+            fwrite(STDERR, "Could not read wupz.php\n");
+            exit(1);
+        }
+        if (preg_match('/^[ \t]*\*[ \t]*Requires PHP:[ \t]*([0-9][0-9.]*)/mi', $header, $match)) {
+            if (version_compare($match[1], $minimum, '<')) {
+                $header = preg_replace(
+                    '/(^[ \t]*\*[ \t]*Requires PHP:[ \t]*)[0-9][0-9.]*/mi',
+                    '${1}' . $minimum,
+                    $header,
+                    1
+                );
+            }
+        } else {
+            $updated = preg_replace(
+                '/(^[ \t]*\*[ \t]*Version:[ \t]*[0-9][0-9.]*[ \t]*$)/m',
+                '$1' . "\n * Requires PHP: {$minimum}",
+                $header,
+                1,
+                $count
+            );
+            if ($count !== 1) {
+                fwrite(STDERR, "Plugin header has no Version line to attach Requires PHP to\n");
+                exit(1);
+            }
+            $header = $updated;
+        }
+        file_put_contents($header_path, $header);
+        if (!preg_match('/^[ \t]*\*[ \t]*Requires PHP:[ \t]*([0-9][0-9.]*)/mi', $header, $check)
+            || version_compare($check[1], $minimum, '<')) {
+            fwrite(STDERR, "Packaged plugin header does not require PHP {$minimum}\n");
+            exit(1);
+        }
+
+        $readme_path = $root . '/readme.txt';
+        if (is_file($readme_path)) {
+            $readme = file_get_contents($readme_path);
+            $readme = preg_replace_callback(
+                '/^Requires PHP:[ \t]*([0-9][0-9.]*)/m',
+                function ($m) use ($minimum) {
+                    return version_compare($m[1], $minimum, '<') ? 'Requires PHP: ' . $minimum : $m[0];
+                },
+                $readme,
+                1
+            );
+            $readme = preg_replace_callback(
+                '/^\* PHP ([0-9][0-9.]*) or higher/m',
+                function ($m) use ($minimum) {
+                    return version_compare($m[1], $minimum, '<') ? '* PHP ' . $minimum . ' or higher' : $m[0];
+                },
+                $readme,
+                1
+            );
+            file_put_contents($readme_path, $readme);
+        }
+
+        $settings_path = $root . '/includes/settings.php';
+        if (is_file($settings_path)) {
+            $settings = file_get_contents($settings_path);
+            $settings = preg_replace_callback(
+                '/(\$min_php_version\s*=\s*[\'"])([0-9][0-9.]*)([\'"])/',
+                function ($m) use ($minimum) {
+                    return version_compare($m[2], $minimum, '<') ? $m[1] . $minimum . $m[3] : $m[0];
+                },
+                $settings,
+                1
+            );
+            file_put_contents($settings_path, $settings);
+        }
+
+        echo "Packaged PHP requirement is {$check[1]} or higher\n";
+        PHP
+
     - name: Remove development files
       run: |
         echo "Removing development files..."
-        
+
         # Remove any development/build files that shouldn't be in the package
         rm -f build/wupz/composer.json
         rm -f build/wupz/composer.lock
@@ -79,54 +190,81 @@ jobs:
         find build/wupz -name "*.log" -delete 2>/dev/null || true
         find build/wupz -name "node_modules" -type d -exec rm -rf {} + 2>/dev/null || true
         find build/wupz -name ".DS_Store" -delete 2>/dev/null || true
-        
+
         echo "✅ Development files removed"
-    
+
     - name: Validate plugin package
       run: |
         echo "Validating plugin package..."
-        
+
         # Check that main plugin file exists
         if [ ! -f "build/wupz/wupz.php" ]; then
           echo "❌ Main plugin file missing from package"
           exit 1
         fi
-        
+
         # Check plugin header
         if ! grep -q "Plugin Name:" build/wupz/wupz.php; then
           echo "❌ Plugin header missing"
           exit 1
         fi
-        
+
+        if [ ! -f "build/wupz/vendor/autoload.php" ]; then
+          echo "❌ vendor/autoload.php missing from package"
+          exit 1
+        fi
+
+        if [ ! -d "build/wupz/vendor/aws/aws-sdk-php" ]; then
+          echo "❌ aws/aws-sdk-php missing from package"
+          exit 1
+        fi
+
         # List package contents
         echo "📦 Package contents:"
         find build/wupz -type f | sort
-        
+
         echo "✅ Plugin package validation passed"
-    
+
     - name: Create ZIP package
       run: |
         echo "Creating ZIP package..."
         cd build
         zip -r "../wupz.zip" wupz/
         cd ..
-        
+
         # Verify ZIP was created
         if [ ! -f "wupz.zip" ]; then
           echo "❌ Failed to create ZIP package"
           exit 1
         fi
-        
+
+        # Same layout as v0.0.1–v0.0.3: one top-level wupz/ directory.
+        # v0.0.4 and later also ship vendor/ inside that directory.
+        # Write the listing to a file so grep -q cannot SIGPIPE unzip.
+        unzip -l wupz.zip > /tmp/wupz-zip-list.txt
+        if ! grep -q ' wupz/wupz.php$' /tmp/wupz-zip-list.txt; then
+          echo "❌ ZIP is missing wupz/wupz.php"
+          exit 1
+        fi
+        if ! grep -q ' wupz/vendor/autoload.php$' /tmp/wupz-zip-list.txt; then
+          echo "❌ ZIP is missing wupz/vendor/autoload.php"
+          exit 1
+        fi
+        if grep -q ' wupz/composer.json$' /tmp/wupz-zip-list.txt; then
+          echo "❌ composer.json must not be packaged"
+          exit 1
+        fi
+
         echo "✅ ZIP package created: wupz.zip"
         echo "📦 Package size: $(du -h wupz.zip | cut -f1)"
-    
+
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
         name: wupz-plugin
         path: wupz.zip
         retention-days: 30
-    
+
     - name: Upload build directory artifact
       uses: actions/upload-artifact@v4
       with:
@@ -139,45 +277,45 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Get plugin version
       id: version
       run: |
         VERSION=$(grep "Version:" wupz-plugin/wupz.php | head -1 | awk -F: '{print $2}' | xargs)
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-    
+
     - name: Download build artifact
       uses: actions/download-artifact@v4
       with:
         name: wupz-plugin
         path: ./
-    
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         name: Wupz v${{ steps.version.outputs.version }}
         body: |
           ## Wupz WordPress Backup Plugin v${{ steps.version.outputs.version }}
-          
+
           ### Installation
           1. Download the `wupz.zip` file below
           2. Go to WordPress Admin → Plugins → Add New → Upload Plugin
           3. Upload the ZIP file and activate the plugin
-          
+
           ### Features
           - Manual and scheduled backups
           - Database and file backups
           - Email notifications
           - System status monitoring
           - Easy-to-use admin interface
-          
+
           ### Documentation
           Visit the [GitHub repository](https://github.com/danielgtmn/Wupz) for documentation.
-          
+
           ---
           **Full Changelog**: https://github.com/danielgtmn/Wupz/commits/${{ github.ref_name }}
         files: |
@@ -185,6 +323,42 @@ jobs:
         draft: false
         prerelease: false
 
+  attach-existing-release:
+    name: Attach zip to existing release
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
 
+    steps:
+    - name: Download build artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: wupz-plugin
+        path: ./
 
- 
+    - name: Upload wupz.zip to the existing release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: ${{ github.event.inputs.tag }}
+      run: |
+        set -euo pipefail
+        test -f wupz.zip
+        unzip -l wupz.zip > /tmp/wupz-zip-list.txt
+        if ! grep -q ' wupz/wupz.php$' /tmp/wupz-zip-list.txt; then
+          echo "::error::ZIP is missing wupz/wupz.php"
+          exit 1
+        fi
+        if ! grep -q ' wupz/vendor/autoload.php$' /tmp/wupz-zip-list.txt; then
+          echo "::error::ZIP is missing wupz/vendor/autoload.php"
+          exit 1
+        fi
+        if ! gh release view "$TAG" >/dev/null 2>&1; then
+          echo "::error::No GitHub release exists for ${TAG}. This job only uploads wupz.zip. It does not create a release or move the tag."
+          exit 1
+        fi
+        if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx 'wupz.zip'; then
+          echo "::error::wupz.zip is already attached to ${TAG}. The tag and the release were left unchanged."
+          exit 1
+        fi
+        gh release upload "$TAG" wupz.zip
+        echo "Attached wupz.zip to ${TAG} without changing the tag or release notes."

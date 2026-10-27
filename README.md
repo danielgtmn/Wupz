@@ -31,7 +31,7 @@ Setup and usage notes live in this repository: **[github.com/danielgtmn/Wupz](ht
 ## 📋 Requirements
 
 - WordPress 5.0 or higher
-- PHP 7.4 or higher
+- PHP 8.1 or higher
 - ZipArchive PHP extension
 - Sufficient disk space for backups
 - File write permissions

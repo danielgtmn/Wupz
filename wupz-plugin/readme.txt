@@ -3,7 +3,7 @@ Contributors: danielgietmann
 Tags: backup, database, files, scheduled, restore
 Requires at least: 5.0
 Tested up to: 6.8
-Requires PHP: 7.4
+Requires PHP: 8.1
 Stable tag: 0.0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -28,7 +28,7 @@ Wupz Backup is a powerful and easy-to-use WordPress backup solution that helps y
 **System Requirements:**
 
 * WordPress 5.0 or higher
-* PHP 7.4 or higher
+* PHP 8.1 or higher
 * ZipArchive PHP extension
 * Sufficient disk space for backups
 * Write permissions for backup directory
@@ -82,6 +82,7 @@ The plugin is designed to work with most standard WordPress hosting environments
 == Changelog ==
 
 = 0.0.4 =
+* Requires PHP 8.1
 * Fixed scheduled backups running on every visit instead of once per daily or weekly interval
 * The Backup Schedule setting, including Disabled, now controls WP-Cron. The legacy schedule_interval option is migrated and kept in sync
 * Delete local backup after S3 upload now follows the storage setting
