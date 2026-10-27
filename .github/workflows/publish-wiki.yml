@@ -1,0 +1,57 @@
+name: Publish Wiki
+
+# docs/ is the source of truth for the GitHub wiki. Every push to main that
+# touches docs/ mirrors it to <repo>.wiki.git; edits made in the wiki UI are
+# overwritten on the next sync.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/publish-wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Sync docs/ to wiki
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Checkout wiki
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository }}.wiki
+        path: wiki
+
+    - name: Copy docs into wiki
+      run: |
+        set -euo pipefail
+        rsync -a --delete --exclude '.git' docs/ wiki/
+        # Pages link to Foo.md so they also work when browsing docs/ in the repo;
+        # the wiki addresses pages without the extension.
+        find wiki -name '*.md' -not -path 'wiki/.git/*' -print0 \
+          | xargs -0 sed -i -E 's|\]\(([^):/#]+)\.md(#[^)]*)?\)|](\1\2)|g'
+
+    - name: Commit and push
+      working-directory: wiki
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -A
+        if git diff --cached --quiet; then
+          echo "Wiki already up to date."
+          exit 0
+        fi
+        git commit -m "Sync docs from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+        git push
