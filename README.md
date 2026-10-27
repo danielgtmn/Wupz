@@ -23,7 +23,7 @@ A comprehensive WordPress backup solution that allows you to create, schedule, a
 
 ## Documentation
 
-Setup and usage notes live in this repository: **[github.com/danielgtmn/Wupz](https://github.com/danielgtmn/Wupz)**.
+The full documentation is published in the **[Wiki](https://github.com/danielgtmn/Wupz/wiki)**. Its source lives in [`docs/`](docs/Home.md) and is synced to the wiki on every push to `main`, so edit the files there rather than in the wiki UI.
 
 - **[Releases](https://github.com/danielgtmn/Wupz/releases)** — download the plugin
 - **[Issues](https://github.com/danielgtmn/Wupz/issues)** — bug reports and questions
