@@ -3,7 +3,7 @@
  * Plugin Name: Wupz Backup
  * Plugin URI: https://wupz.org
  * Description: A comprehensive WordPress backup solution that allows manual and scheduled backups of your database and files.
- * Version: 0.0.2
+ * Version: 0.0.4
  * Author: Daniel Gietmann
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -23,7 +23,7 @@ if (file_exists(plugin_dir_path(__FILE__) . 'vendor/autoload.php')) {
 // Define plugin constants
 define('WUPZ_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WUPZ_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('WUPZ_PLUGIN_VERSION', '0.0.3');
+define('WUPZ_PLUGIN_VERSION', '0.0.4');
 define('WUPZ_BACKUP_DIR', WP_CONTENT_DIR . '/wupz-backups/');
 
 /**
@@ -35,7 +35,8 @@ class Wupz {
      * Constructor
      */
     public function __construct() {
-        add_action('init', array($this, 'init'));
+        // Priority 5 so schedule maintenance runs before wp_cron (priority 10).
+        add_action('init', array($this, 'init'), 5);
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
     }
@@ -56,7 +57,8 @@ class Wupz {
             new Wupz_Updater(__FILE__);
         }
         
-        new Wupz_Schedule();
+        $schedule = new Wupz_Schedule();
+        $schedule->ensure_schedule();
         
         // Add admin menu
         add_action('admin_menu', array($this, 'add_admin_menu'));
@@ -274,18 +276,25 @@ class Wupz {
             file_put_contents(WUPZ_BACKUP_DIR . '.htaccess', $htaccess_content);
         }
         
-        // Set default options
+        $this->include_files();
+
+        // Set default options. backup_schedule is what the settings screen
+        // saves; schedule_interval is the legacy key kept in sync.
         if (!get_option('wupz_settings')) {
             update_option('wupz_settings', array(
+                'backup_schedule' => 'weekly',
                 'schedule_interval' => 'weekly',
                 'max_backups' => 5,
                 'backup_database' => 1,
                 'backup_files' => 1
             ));
         }
-        
-        // Schedule first backup if auto-backup is enabled
-        wp_schedule_event(time(), 'weekly', 'wupz_scheduled_backup');
+
+        $schedule = new Wupz_Schedule();
+        $schedule->migrate_schedule_setting();
+        $settings = get_option('wupz_settings', array());
+        $schedule->apply_schedule(Wupz_Schedule::resolve_interval(is_array($settings) ? $settings : array()));
+        update_option('wupz_plugin_version', WUPZ_PLUGIN_VERSION);
     }
     
     /**
@@ -305,7 +314,7 @@ class Wupz {
         $schedule = sanitize_text_field(wp_unslash($_POST['schedule']));
         $allowed = array('disabled', 'daily', 'weekly');
         
-        if (in_array($schedule, $allowed)) {
+        if (in_array($schedule, $allowed, true)) {
             $schedule_manager = new Wupz_Schedule();
             $schedule_manager->update_schedule($schedule);
             wp_send_json_success();

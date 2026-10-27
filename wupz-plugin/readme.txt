@@ -4,7 +4,7 @@ Tags: backup, database, files, scheduled, restore
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.0.2
+Stable tag: 0.0.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -54,7 +54,7 @@ Backups are stored in the `/wp-content/wupz-backups/` directory on your server. 
 
 = Can I schedule automatic backups? =
 
-Yes! You can set up daily or weekly automatic backups in the plugin settings. The plugin uses WordPress cron functionality for scheduling.
+Yes. Choose Daily or Weekly under Wupz → Settings. Disabled removes the scheduled event. WordPress cron runs the backup once per interval. The next run is one interval after you save the setting (or after you update to 0.0.4), then it repeats. It does not run on every page view.
 
 = What gets included in backups? =
 
@@ -66,7 +66,7 @@ Currently, the plugin focuses on creating backups. For restoration, you can down
 
 = Can I exclude certain files from backups? =
 
-Yes, you can specify file patterns to exclude in the plugin settings (e.g., cache files, temporary files, logs).
+Yes. Exclude patterns in the plugin settings are applied while wp-content is archived. A trailing slash matches a directory name anywhere under wp-content (cache/, tmp/, temp/). Use * as a wildcard (*.log, *.tmp). Files larger than the maximum file size (100 MB by default) are skipped. The backup directory itself is always skipped.
 
 = Will this work with my hosting provider? =
 
@@ -80,6 +80,14 @@ The plugin is designed to work with most standard WordPress hosting environments
 4. System status check showing environment compatibility
 
 == Changelog ==
+
+= 0.0.4 =
+* Fixed scheduled backups running on every visit instead of once per daily or weekly interval
+* The Backup Schedule setting, including Disabled, now controls WP-Cron. The legacy schedule_interval option is migrated and kept in sync
+* Delete local backup after S3 upload now follows the storage setting
+* Exclude patterns and maximum file size are applied during file backup
+* S3 retention only lists and deletes Wupz backup objects (wupz-backup-YYYY-MM-DD_HH-MM-SS.zip)
+* Documentation links point at the GitHub repository
 
 = 0.0.2 =
 * Added system status check functionality
@@ -97,12 +105,15 @@ The plugin is designed to work with most standard WordPress hosting environments
 
 == Upgrade Notice ==
 
+= 0.0.4 =
+Scheduled backups now follow the saved Daily, Weekly, or Disabled setting and no longer run on every page load. After updating, check Wupz → Settings → Backup Schedule. The next automatic backup is one interval after the update, then repeats. If a previous settings save stored Disabled (the old form could show that even while backups were still running), automatic backups stay off until you choose Daily or Weekly. Default exclude patterns now also skip *.log and *.tmp, which the settings screen already listed. S3 cleanup no longer counts or deletes other objects in the bucket.
+
 = 0.0.2 =
 This version includes important security improvements and system status monitoring. Please update to ensure optimal security and functionality.
 
 == Support ==
 
-For support and detailed documentation, please visit our official documentation site: https://docs.wups.org
+For support, please use the GitHub repository: https://github.com/danielgtmn/Wupz
 
 == Privacy ==
 

@@ -9,6 +9,12 @@ if (!defined('ABSPATH')) {
 }
 
 class Wupz_Settings {
+
+    /**
+     * When true, update_option skips the form sanitizer so a schedule
+     * migration can store the option without treating it as a form post.
+     */
+    private static $raw_update = false;
     
     /**
      * Default settings
@@ -17,7 +23,7 @@ class Wupz_Settings {
         'max_backups' => 5,
         'backup_database' => true,
         'backup_files' => true,
-        'backup_schedule' => 'disabled',
+        'backup_schedule' => 'weekly',
         'backup_time' => '02:00',
         'backup_day' => 'sunday',
         'email_notifications' => false,
@@ -178,6 +184,14 @@ class Wupz_Settings {
             'wupz_settings',
             'wupz_advanced_section'
         );
+
+        add_settings_field(
+            'max_file_size',
+            __('Maximum File Size', 'wupz'),
+            array($this, 'max_file_size_callback'),
+            'wupz_settings',
+            'wupz_advanced_section'
+        );
     }
 
     /**
@@ -312,8 +326,8 @@ class Wupz_Settings {
      * Schedule interval field callback
      */
     public function backup_schedule_callback() {
-        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
-        $value = $settings['backup_schedule'];
+        $stored = get_option('wupz_settings', array());
+        $value = Wupz_Schedule::resolve_interval(is_array($stored) ? $stored : array());
         
         $intervals = array(
             'disabled' => __('Disabled', 'wupz'),
@@ -326,7 +340,7 @@ class Wupz_Settings {
             echo '<option value="' . esc_attr($key) . '" ' . selected($value, $key, false) . '>' . esc_html($label) . '</option>';
         }
         echo '</select>';
-        echo '<p class="description">' . esc_html__('How often to automatically create backups.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('How often to create backups. Disabled removes the scheduled event. Daily and weekly run once per interval, with the next run one interval after you save.', 'wupz') . '</p>';
     }
     
     /**
@@ -426,10 +440,26 @@ class Wupz_Settings {
      */
     public function exclude_patterns_callback() {
         $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
-        $value = implode("\n", $settings['exclude_patterns']);
+        $patterns = isset($settings['exclude_patterns']) && is_array($settings['exclude_patterns'])
+            ? $settings['exclude_patterns']
+            : self::$defaults['exclude_patterns'];
+        $value = implode("\n", $patterns);
         
         echo '<textarea name="wupz_settings[exclude_patterns]" rows="5" cols="50" class="large-text code">' . esc_textarea($value) . '</textarea>';
-        echo '<p class="description">' . esc_html__('One pattern per line. Use wildcards (*) to match characters.', 'wupz') . '</p>';
+        echo '<p class="description">' . esc_html__('One pattern per line. A trailing slash matches a directory name anywhere under wp-content (for example cache/). Use * as a wildcard. The backup directory itself is always skipped.', 'wupz') . '</p>';
+    }
+
+    /**
+     * Maximum file size field callback.
+     * The option is stored in bytes. The field is edited in megabytes.
+     */
+    public function max_file_size_callback() {
+        $settings = wp_parse_args(get_option('wupz_settings', array()), self::$defaults);
+        $bytes = isset($settings['max_file_size']) ? (int) $settings['max_file_size'] : (int) self::$defaults['max_file_size'];
+        $megabytes = $bytes > 0 ? (int) round($bytes / 1048576) : 0;
+
+        echo '<input type="number" name="wupz_settings[max_file_size]" value="' . esc_attr($megabytes) . '" min="0" step="1" class="small-text" /> MB';
+        echo '<p class="description">' . esc_html__('Skip files larger than this. 100 MB is the limit backups used before this setting was applied. Set to 0 to include files of any size.', 'wupz') . '</p>';
     }
     
     /**
@@ -439,43 +469,117 @@ class Wupz_Settings {
      * @return array Sanitized settings
      */
     public function sanitize_settings($input) {
-        $sanitized_input = array();
+        if (self::$raw_update) {
+            return is_array($input) ? $input : array();
+        }
+
+        $existing = get_option('wupz_settings', array());
+        if (!is_array($existing)) {
+            $existing = array();
+        }
+        if (!is_array($input)) {
+            return $existing;
+        }
+
+        $sanitized_input = $existing;
         
         // Sanitize max_backups
         if (isset($input['max_backups'])) {
             $sanitized_input['max_backups'] = absint($input['max_backups']);
         }
         
-        // Sanitize checkboxes
+        // Unchecked boxes are omitted from the form post.
         $checkboxes = array('backup_database', 'backup_files', 'email_notifications');
         foreach ($checkboxes as $checkbox) {
-            $sanitized_input[$checkbox] = isset($input[$checkbox]) ? 1 : 0;
+            $sanitized_input[$checkbox] = !empty($input[$checkbox]) ? 1 : 0;
         }
         
-        // Sanitize schedule interval
+        // Sanitize schedule interval. Both keys stay in sync. Reschedule
+        // only when the effective interval actually changes.
         if (isset($input['backup_schedule'])) {
             $allowed_intervals = array('disabled', 'daily', 'weekly');
-            $sanitized_input['backup_schedule'] = in_array($input['backup_schedule'], $allowed_intervals) 
-                ? $input['backup_schedule'] 
+            $interval = in_array($input['backup_schedule'], $allowed_intervals, true)
+                ? $input['backup_schedule']
                 : 'weekly';
-                
-            // Update schedule if changed
-            $current_settings = get_option('wupz_settings', array());
-            $current_interval = isset($current_settings['backup_schedule']) ? $current_settings['backup_schedule'] : 'weekly';
-            
-            if ($sanitized_input['backup_schedule'] !== $current_interval) {
+            $sanitized_input['backup_schedule'] = $interval;
+            $sanitized_input['schedule_interval'] = $interval;
+
+            $current_interval = Wupz_Schedule::resolve_interval($existing);
+            if ($interval !== $current_interval) {
                 $schedule = new Wupz_Schedule();
-                $schedule->update_schedule($sanitized_input['backup_schedule']);
+                $schedule->apply_schedule($interval);
             }
+        }
+
+        if (isset($input['max_file_size'])) {
+            $megabytes = absint($input['max_file_size']);
+            $sanitized_input['max_file_size'] = $megabytes * 1048576;
         }
         
         // Sanitize exclude patterns
         if (isset($input['exclude_patterns'])) {
-            $patterns = explode("\n", $input['exclude_patterns']);
-            $sanitized_input['exclude_patterns'] = array_map('sanitize_text_field', $patterns);
+            $sanitized_input['exclude_patterns'] = self::parse_exclude_patterns($input['exclude_patterns']);
         }
         
         return $sanitized_input;
+    }
+
+    /**
+     * Persist settings without running the form sanitizer.
+     *
+     * @param array $settings
+     */
+    public static function update_settings_raw($settings) {
+        self::$raw_update = true;
+        update_option('wupz_settings', is_array($settings) ? $settings : array());
+        self::$raw_update = false;
+    }
+
+    /**
+     * Exclude patterns and the max file size used while archiving wp-content.
+     *
+     * @return array{exclude_patterns: array, max_file_size: int}
+     */
+    public static function get_file_rules() {
+        $settings = self::get_settings();
+        $patterns = (isset($settings['exclude_patterns']) && is_array($settings['exclude_patterns']))
+            ? $settings['exclude_patterns']
+            : self::$defaults['exclude_patterns'];
+        $max_file_size = isset($settings['max_file_size']) ? (int) $settings['max_file_size'] : (int) self::$defaults['max_file_size'];
+        if ($max_file_size < 0) {
+            $max_file_size = 0;
+        }
+
+        return array(
+            'exclude_patterns' => array_values($patterns),
+            'max_file_size' => $max_file_size,
+        );
+    }
+
+    /**
+     * @param mixed $value Textarea contents or a stored list
+     * @return array
+     */
+    public static function parse_exclude_patterns($value) {
+        if (is_array($value)) {
+            $lines = $value;
+        } else {
+            $lines = preg_split('/\r\n|\r|\n/', (string) $value);
+            if (!is_array($lines)) {
+                $lines = array();
+            }
+        }
+
+        $patterns = array();
+        foreach ($lines as $line) {
+            $line = sanitize_text_field(trim((string) $line));
+            if ($line === '' || $line === '.' || $line === '..') {
+                continue;
+            }
+            $patterns[] = $line;
+        }
+
+        return $patterns;
     }
 
     /**
@@ -560,7 +664,7 @@ class Wupz_Settings {
                     <div class="wupz-info-box">
                         <h3><?php esc_html_e('Support', 'wupz'); ?></h3>
                         <p><?php esc_html_e('Need help with Wupz? Check out our documentation or contact support.', 'wupz'); ?></p>
-                        <a target="_blank" href="https://docs.wupz.org" class="button button-secondary"><?php esc_html_e('Documentation', 'wupz'); ?></a>
+                        <a target="_blank" rel="noopener noreferrer" href="https://github.com/danielgtmn/Wupz" class="button button-secondary"><?php esc_html_e('Documentation', 'wupz'); ?></a>
                     </div>
 
                     <div class="wupz-info-box">

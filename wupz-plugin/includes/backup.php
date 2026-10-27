@@ -16,9 +16,10 @@ class Wupz_Backup {
      * @return array Result array with success status and message
      */
     public function create_backup() {
-        $settings = get_option('wupz_settings', array());
-        $backup_database = isset($settings['backup_database']) ? $settings['backup_database'] : 1;
-        $backup_files = isset($settings['backup_files']) ? $settings['backup_files'] : 1;
+        $settings = Wupz_Settings::get_settings();
+        $backup_database = !empty($settings['backup_database']);
+        $backup_files = !empty($settings['backup_files']);
+        $file_rules = Wupz_Settings::get_file_rules();
         
         try {
             // Create backup directory if it doesn't exist
@@ -52,7 +53,13 @@ class Wupz_Backup {
             
             // Backup files
             if ($backup_files) {
-                $this->add_directory_to_zip($zip, WP_CONTENT_DIR, 'wp-content');
+                $this->add_directory_to_zip(
+                    $zip,
+                    WP_CONTENT_DIR,
+                    'wp-content',
+                    $file_rules['exclude_patterns'],
+                    $file_rules['max_file_size']
+                );
             }
             
             $zip->close();
@@ -64,22 +71,27 @@ class Wupz_Backup {
             
             // Clean up old backups
             $this->cleanup_old_backups();
+
+            $backup_size_bytes = file_exists($backup_path) ? filesize($backup_path) : 0;
             
-            // Upload to S3 if configured
+            // Upload to S3 if configured.
+            // s3_delete_local is stored on wupz_storage_settings, not wupz_settings.
             $s3 = new Wupz_S3();
             if ($s3->is_configured()) {
                 $s3_upload_success = $s3->upload_file($backup_path, $backup_filename);
+                $storage_settings = get_option('wupz_storage_settings', array());
 
-                if ($s3_upload_success && !empty($settings['s3_delete_local'])) {
+                if ($s3_upload_success && is_array($storage_settings) && !empty($storage_settings['s3_delete_local'])) {
                     wp_delete_file($backup_path);
                 }
             }
 
-            // Update last backup info
+            // Update last backup info. Size is captured before a successful
+            // S3 upload is allowed to remove the local file.
             update_option('wupz_last_backup', array(
                 'timestamp' => time(),
                 'filename' => $backup_filename,
-                'size' => filesize($backup_path),
+                'size' => $backup_size_bytes,
                 'status' => 'completed'
             ));
             
@@ -87,7 +99,7 @@ class Wupz_Backup {
                 'success' => true,
                 'message' => __('Backup created successfully', 'wupz'),
                 'filename' => $backup_filename,
-                'size' => $this->format_bytes(filesize($backup_path))
+                'size' => $this->format_bytes($backup_size_bytes)
             );
             
         } catch (Exception $e) {
@@ -207,40 +219,138 @@ class Wupz_Backup {
      * @param ZipArchive $zip ZIP archive object
      * @param string $dir Directory path to add
      * @param string $zip_dir Path in ZIP archive
+     * @param array $patterns Exclude patterns from settings
+     * @param int $max_file_size Skip files larger than this many bytes. 0 disables the limit.
      */
-    private function add_directory_to_zip($zip, $dir, $zip_dir = '') {
-        if (is_dir($dir)) {
-            $files = scandir($dir);
-            
-            foreach ($files as $file) {
-                if ($file != '.' && $file != '..') {
-                    $file_path = $dir . '/' . $file;
-                    $zip_path = $zip_dir ? $zip_dir . '/' . $file : $file;
-                    
-                    // Skip wupz-backups directory to avoid recursive backups
-                    if (basename($file_path) === 'wupz-backups') {
-                        continue;
-                    }
-                    
-                    // Skip cache directories
-                    if (in_array(basename($file_path), array('cache', 'tmp', 'temp'))) {
-                        continue;
-                    }
-                    
-                    if (is_dir($file_path)) {
-                        $zip->addEmptyDir($zip_path);
-                        $this->add_directory_to_zip($zip, $file_path, $zip_path);
-                    } else {
-                        // Skip large files over 100MB to prevent memory issues
-                        if (filesize($file_path) > 100 * 1024 * 1024) {
-                            continue;
-                        }
-                        
-                        $zip->addFile($file_path, $zip_path);
-                    }
+    private function add_directory_to_zip($zip, $dir, $zip_dir, $patterns, $max_file_size) {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $files = scandir($dir);
+        if (!is_array($files)) {
+            return;
+        }
+
+        $backup_root = rtrim(str_replace('\\', '/', WUPZ_BACKUP_DIR), '/');
+
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            $file_path = $dir . '/' . $file;
+            $zip_path = $zip_dir ? $zip_dir . '/' . $file : $file;
+            $normalized = rtrim(str_replace('\\', '/', $file_path), '/');
+
+            // Always skip the backup store so a new archive cannot contain
+            // older archives, even if the user removes that exclude pattern.
+            if ($normalized === $backup_root) {
+                continue;
+            }
+
+            $is_dir = is_dir($file_path);
+            if (self::should_exclude_path($zip_path, $is_dir, $patterns)) {
+                continue;
+            }
+
+            if ($is_dir) {
+                $zip->addEmptyDir($zip_path);
+                $this->add_directory_to_zip($zip, $file_path, $zip_path, $patterns, $max_file_size);
+                continue;
+            }
+
+            if ($max_file_size > 0) {
+                $size = filesize($file_path);
+                if ($size !== false && $size > $max_file_size) {
+                    continue;
                 }
             }
+
+            $zip->addFile($file_path, $zip_path);
         }
+    }
+
+    /**
+     * Whether a wp-content relative path matches an exclude pattern.
+     *
+     * A trailing slash matches a directory of that name (cache/ skips any
+     * directory named cache). Other patterns match the file or directory
+     * name, or a path suffix. * and ? are wildcards and do not cross slashes.
+     *
+     * @param string $relative_path Path inside the archive, using forward slashes
+     * @param bool $is_dir
+     * @param array $patterns
+     * @return bool
+     */
+    public static function should_exclude_path($relative_path, $is_dir, $patterns) {
+        if (!is_array($patterns)) {
+            return false;
+        }
+
+        $relative_path = str_replace('\\', '/', (string) $relative_path);
+        $relative_path = ltrim($relative_path, '/');
+        $basename = basename($relative_path);
+
+        foreach ($patterns as $pattern) {
+            $pattern = trim(str_replace('\\', '/', (string) $pattern));
+            if ($pattern === '') {
+                continue;
+            }
+
+            $directory_pattern = substr($pattern, -1) === '/';
+            $body = $directory_pattern ? rtrim($pattern, '/') : $pattern;
+            if ($body === '' || $body === '.' || $body === '..') {
+                continue;
+            }
+
+            if ($directory_pattern && !$is_dir) {
+                continue;
+            }
+
+            if (self::pattern_matches_path($body, $basename, $relative_path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param string $pattern Pattern without a trailing slash
+     * @param string $basename
+     * @param string $relative_path
+     * @return bool
+     */
+    private static function pattern_matches_path($pattern, $basename, $relative_path) {
+        $has_wildcard = (strpos($pattern, '*') !== false || strpos($pattern, '?') !== false);
+
+        if (!$has_wildcard) {
+            if (strpos($pattern, '/') === false) {
+                return $basename === $pattern;
+            }
+
+            return $relative_path === $pattern
+                || substr($relative_path, -(strlen($pattern) + 1)) === '/' . $pattern;
+        }
+
+        $quoted = preg_quote($pattern, '/');
+        $regex = '/^' . str_replace(array('\\*', '\\?'), array('[^\\/]*', '[^\\/]'), $quoted) . '$/';
+
+        if (preg_match($regex, $basename) || preg_match($regex, $relative_path)) {
+            return true;
+        }
+
+        $parts = explode('/', $relative_path);
+        $count = count($parts);
+        for ($i = 1; $i < $count; $i++) {
+            $suffix = implode('/', array_slice($parts, $i));
+            if (preg_match($regex, $suffix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
     
     /**
@@ -256,11 +366,12 @@ class Wupz_Backup {
         
         $backups = $this->get_backup_list();
         
-        // Handle S3 backups
+        // Handle S3 backups. Only a complete listing of Wupz's own objects
+        // is safe to trim; a truncated or failed list must not delete anything.
         $s3 = new Wupz_S3();
         if ($s3->is_configured()) {
             $s3_files = $s3->list_files();
-            if (count($s3_files) > $max_backups) {
+            if ($s3->list_is_complete() && count($s3_files) > $max_backups) {
                 // Sort by date (oldest first)
                 usort($s3_files, function($a, $b) {
                     return $a['LastModified'] <=> $b['LastModified'];
