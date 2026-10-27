@@ -21,16 +21,12 @@ A comprehensive WordPress backup solution that allows you to create, schedule, a
 4. **Navigate** to WordPress Admin → Wupz
 5. **Create** your first backup!
 
-## 📖 Documentation
+## Documentation
 
-For detailed installation, configuration, and usage instructions, please visit our **[official documentation site](https://docs.wups.org)**.
+Setup and usage notes live in this repository: **[github.com/danielgtmn/Wupz](https://github.com/danielgtmn/Wupz)**.
 
-- **[Installation Guide](https://docs.wups.org/plugins/wupz-backup/installation)** - Step-by-step installation
-- **[Configuration](https://docs.wups.org/plugins/wupz-backup/configuration)** - Setup and settings
-- **[Usage Guide](https://docs.wups.org/plugins/wupz-backup/usage)** - How to use Wupz
-- **[Scheduled Backups](https://docs.wups.org/plugins/wupz-backup/scheduled-backups)** - Automated backups
-- **[Troubleshooting](https://docs.wups.org/plugins/wupz-backup/troubleshooting)** - Common issues and solutions
-- **[Auto-Updates](https://docs.wups.org/plugins/wupz-backup/auto-updates)** - How the plugin stays up-to-date
+- **[Releases](https://github.com/danielgtmn/Wupz/releases)** — download the plugin
+- **[Issues](https://github.com/danielgtmn/Wupz/issues)** — bug reports and questions
 
 ## 📋 Requirements
 
@@ -50,9 +46,8 @@ For detailed installation, configuration, and usage instructions, please visit o
 
 ## 🆘 Support
 
-- **Documentation**: Check our [official documentation](https://docs.wups.org) first
-- **Issues**: [GitHub Issues](https://github.com/danielgtmn/wupz/issues)
-- **Troubleshooting**: [Troubleshooting Guide](https://docs.wups.org/plugins/wupz-backup/troubleshooting)
+- **Repository**: [github.com/danielgtmn/Wupz](https://github.com/danielgtmn/Wupz)
+- **Issues**: [GitHub Issues](https://github.com/danielgtmn/Wupz/issues)
 
 ## 📄 License
 

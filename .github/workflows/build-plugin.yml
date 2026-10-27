@@ -176,7 +176,7 @@ jobs:
           - Easy-to-use admin interface
           
           ### Documentation
-          Visit our [Wiki](https://docs.wupz.org/plugins/wupz-backup) for detailed documentation.
+          Visit the [GitHub repository](https://github.com/danielgtmn/Wupz) for documentation.
           
           ---
           **Full Changelog**: https://github.com/danielgtmn/Wupz/commits/${{ github.ref_name }}
